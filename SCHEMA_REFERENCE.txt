@@ -1,0 +1,300 @@
+================================================================================
+CASA AMIGA - DATABASE SCHEMA REFERENCE
+================================================================================
+
+PROJECT ID: sajrwsfpvkitqubvzotc
+URL: https://sajrwsfpvkitqubvzotc.supabase.co
+
+================================================================================
+TABLES TO BE CREATED (10 Total)
+================================================================================
+
+1. USERS (Auth + Role Management)
+   - id (UUID, PK, refs auth.users)
+   - email (TEXT, UNIQUE)
+   - full_name (TEXT)
+   - role (user_role enum: 'admin' | 'agent')
+   - agent_name (TEXT)
+   - created_at, updated_at (TIMESTAMP)
+   - RLS: Users see own profile, admins see all
+
+2. BOOKINGS (Central Booking Entity - 30+ fields)
+   - id (UUID, PK)
+   - booking_id_number (BIGSERIAL, UNIQUE)
+   - booking_date, booking_ref (DATE/TEXT)
+   - agent_id (FK -> inventory_agents)
+   - apartment_id (FK -> inventory_apartments)
+   - platform_id (FK -> inventory_platforms)
+   - status (booking_status enum: CONFIRMED | PENDING CONFIRMATION | CANCELLED)
+   - guest_name, guest_phone, guest_email (TEXT)
+   - check_in_date, check_in_time (DATE/TIME)
+   - check_out_date, check_out_time (DATE/TIME)
+   - nights (GENERATED: check_out_date - check_in_date)
+   - number_of_guests (INTEGER)
+   - deposit (yes_no_na enum), deposit_amount (DECIMAL)
+   - payment_type_id (FK -> inventory_payment_types)
+   - comments, guest_comments (TEXT)
+   - price_basis (price_basis enum: DAY | WEEK | MONTH)
+   - daily_price (DECIMAL, NOT NULL)
+   - cleaning_charge, other_charge (DECIMAL, default 0)
+   - guest_total_amount (DECIMAL, manually editable for adjustments)
+   - police_registration (task_status enum)
+   - platform_invoice, platform_invoice_date (task_status/DATE)
+   - final_liquidation, final_liquidation_date (task_status/DATE)
+   - created_by (FK -> users)
+   - created_at, updated_at (TIMESTAMP)
+   - INDEXES: apartment_id, agent_id, check_in_date, check_out_date
+   - RLS: Users see all bookings, can insert/update if agent/admin
+
+3. REVENUE_INVOICING (Income Tracking)
+   - id (UUID, PK)
+   - revenue_type (revenue_type enum: INVOICE | COLLECTION)
+   - revenue_number (BIGSERIAL, UNIQUE)
+   - revenue_date (DATE)
+   - apartment_id (FK -> inventory_apartments)
+   - booking_id (FK -> bookings)
+   - guest_name (GENERATED from bookings.guest_name)
+   - invoice_item_id (FK -> inventory_invoice_items)
+   - total_services (DECIMAL)
+   - commission_percentage (DECIMAL)
+   - amount (GENERATED: total_services * (commission_percentage / 100))
+   - issued (BOOLEAN, default FALSE)
+   - attachment_url (TEXT)
+   - created_by (FK -> users)
+   - created_at, updated_at (TIMESTAMP)
+   - INDEXES: booking_id, apartment_id
+   - RLS: Users see all revenue, can insert/update if agent/admin
+
+4. EXPENSES (Cost Tracking)
+   - id (UUID, PK)
+   - expense_type (expense_type_enum enum: INVOICE | PAYMENT)
+   - expense_category_id (FK -> inventory_expense_types)
+   - vendor (TEXT, NOT NULL)
+   - expense_date (DATE)
+   - invoice_number (TEXT)
+   - amount (DECIMAL)
+   - vat (DECIMAL, default 0)
+   - total (GENERATED: amount + COALESCE(vat, 0))
+   - apartment_id (FK -> inventory_apartments)
+   - booking_id (FK -> bookings, nullable)
+   - attachment_url (TEXT)
+   - comments (TEXT)
+   - created_by (FK -> users)
+   - created_at, updated_at (TIMESTAMP)
+   - INDEXES: apartment_id, booking_id
+   - RLS: Users see all expenses, can insert/update if agent/admin
+
+5. INVENTORY_AGENTS (Master Data - Agent List)
+   - id (UUID, PK)
+   - name (TEXT, UNIQUE)
+   - created_at (TIMESTAMP)
+   - SEED DATA: 2 records (BM, KW)
+   - RLS: All can read, admins can insert/update
+
+6. INVENTORY_APARTMENTS (Master Data - Property List)
+   - id (UUID, PK)
+   - name (TEXT, UNIQUE)
+   - created_at (TIMESTAMP)
+   - SEED DATA: 5 records (Barbarita, TMB, Catamaran, Cas Artur, Alexandrite)
+   - RLS: All can read, admins can insert/update
+
+7. INVENTORY_PLATFORMS (Master Data - Booking Platforms)
+   - id (UUID, PK)
+   - name (TEXT, UNIQUE)
+   - created_at (TIMESTAMP)
+   - SEED DATA: 4 records (Bookings, Airbnb, Idealista, Organic)
+   - RLS: All can read, admins can insert/update
+
+8. INVENTORY_EXPENSE_TYPES (Master Data - Expense Categories)
+   - id (UUID, PK)
+   - name (TEXT, UNIQUE)
+   - created_at (TIMESTAMP)
+   - SEED DATA: 5 records (Cleaning, Laundry, Supplies, Tax, Other)
+   - RLS: All can read, admins can insert/update
+
+9. INVENTORY_INVOICE_ITEMS (Master Data - Invoice Line Items)
+   - id (UUID, PK)
+   - name (TEXT, UNIQUE)
+   - created_at (TIMESTAMP)
+   - SEED DATA: 3 records (Commission, Cleaning&Laundry, Other)
+   - RLS: All can read, admins can insert/update
+
+10. INVENTORY_PAYMENT_TYPES (Master Data - Payment Methods)
+    - id (UUID, PK)
+    - name (TEXT, UNIQUE)
+    - created_at (TIMESTAMP)
+    - SEED DATA: 4 records (Cash, Transfer, Platform, NA)
+    - RLS: All can read, admins can insert/update
+
+================================================================================
+ENUM TYPES (7 Total)
+================================================================================
+
+1. user_role
+   VALUES: 'admin', 'agent'
+
+2. booking_status
+   VALUES: 'CONFIRMED', 'PENDING CONFIRMATION', 'CANCELLED'
+
+3. price_basis
+   VALUES: 'DAY', 'WEEK', 'MONTH'
+
+4. task_status
+   VALUES: 'TO BE DONE', 'DONE', 'NA'
+
+5. revenue_type
+   VALUES: 'INVOICE', 'COLLECTION'
+
+6. expense_type_enum
+   VALUES: 'INVOICE', 'PAYMENT'
+
+7. yes_no_na
+   VALUES: 'Y', 'N', 'NA'
+
+================================================================================
+PERFORMANCE INDEXES (8 Total)
+================================================================================
+
+1. idx_bookings_apartment_id (bookings.apartment_id)
+2. idx_bookings_agent_id (bookings.agent_id)
+3. idx_bookings_check_in_date (bookings.check_in_date)
+4. idx_bookings_check_out_date (bookings.check_out_date)
+5. idx_revenue_booking_id (revenue_invoicing.booking_id)
+6. idx_revenue_apartment_id (revenue_invoicing.apartment_id)
+7. idx_expenses_apartment_id (expenses.apartment_id)
+8. idx_expenses_booking_id (expenses.booking_id)
+
+================================================================================
+ROW LEVEL SECURITY POLICIES (20+ Policies)
+================================================================================
+
+USERS Table (2 policies):
+  - "Users can view own profile" - Users see own profile
+  - "Admins can view all users" - Admins see all
+
+BOOKINGS Table (3 policies):
+  - "Users can view bookings" - Users see all bookings
+  - "Users can insert bookings" - Agents/admins can create
+  - "Users can update bookings" - Users can update
+
+REVENUE_INVOICING Table (3 policies):
+  - "Users can view revenue" - Users see all revenue
+  - "Users can insert revenue" - Agents/admins can create
+  - "Users can update revenue" - Users can update
+
+EXPENSES Table (3 policies):
+  - "Users can view expenses" - Users see all expenses
+  - "Users can insert expenses" - Agents/admins can create
+  - "Users can update expenses" - Users can update
+
+INVENTORY_AGENTS Table (3 policies):
+  - "Inventory read access" - All can read
+  - "Inventory agents admin insert" - Admins can insert
+  - "Inventory agents admin update" - Admins can update
+
+INVENTORY_APARTMENTS Table (3 policies):
+  - "Inventory apartments read" - All can read
+  - "Inventory apartments admin insert" - Admins can insert
+  - "Inventory apartments admin update" - Admins can update
+
+INVENTORY_PLATFORMS Table (3 policies):
+  - "Inventory platforms read" - All can read
+  - "Inventory platforms admin insert" - Admins can insert
+  - "Inventory platforms admin update" - Admins can update
+
+INVENTORY_EXPENSE_TYPES Table (3 policies):
+  - "Inventory expense types read" - All can read
+  - "Inventory expense types admin insert" - Admins can insert
+  - "Inventory expense types admin update" - Admins can update
+
+INVENTORY_INVOICE_ITEMS Table (3 policies):
+  - "Inventory invoice items read" - All can read
+  - "Inventory invoice items admin insert" - Admins can insert
+  - "Inventory invoice items admin update" - Admins can update
+
+INVENTORY_PAYMENT_TYPES Table (3 policies):
+  - "Inventory payment types read" - All can read
+  - "Inventory payment types admin insert" - Admins can insert
+  - "Inventory payment types admin update" - Admins can update
+
+================================================================================
+AUTO-CALCULATED FIELDS
+================================================================================
+
+1. bookings.nights
+   FORMULA: check_out_date - check_in_date
+   TYPE: INTEGER GENERATED ALWAYS AS ... STORED
+
+2. bookings.guest_total_amount (manually overridable)
+   NOTE: Can be manually edited for adjustments
+   FORMULA: (daily_price × nights) + cleaning_charge + other_charge
+   TYPE: DECIMAL(10, 2)
+
+3. revenue_invoicing.guest_name
+   FORMULA: SELECT guest_name FROM bookings WHERE bookings.id = booking_id
+   TYPE: TEXT GENERATED ALWAYS AS ... STORED
+
+4. revenue_invoicing.amount
+   FORMULA: total_services * (commission_percentage / 100)
+   TYPE: DECIMAL(10, 2) GENERATED ALWAYS AS ... STORED
+
+5. expenses.total
+   FORMULA: amount + COALESCE(vat, 0)
+   TYPE: DECIMAL(10, 2) GENERATED ALWAYS AS ... STORED
+
+================================================================================
+KEY CONSTRAINTS
+================================================================================
+
+FOREIGN KEYS:
+  - users.id -> auth.users.id (ON DELETE CASCADE)
+  - bookings.agent_id -> inventory_agents.id
+  - bookings.apartment_id -> inventory_apartments.id
+  - bookings.platform_id -> inventory_platforms.id
+  - bookings.payment_type_id -> inventory_payment_types.id
+  - bookings.created_by -> users.id
+  - revenue_invoicing.apartment_id -> inventory_apartments.id
+  - revenue_invoicing.booking_id -> bookings.id
+  - revenue_invoicing.invoice_item_id -> inventory_invoice_items.id
+  - revenue_invoicing.created_by -> users.id
+  - expenses.expense_category_id -> inventory_expense_types.id
+  - expenses.apartment_id -> inventory_apartments.id
+  - expenses.booking_id -> bookings.id (nullable)
+  - expenses.created_by -> users.id
+
+UNIQUE CONSTRAINTS:
+  - users.email
+  - bookings.booking_id_number
+  - revenue_invoicing.revenue_number
+  - inventory_agents.name
+  - inventory_apartments.name
+  - inventory_platforms.name
+  - inventory_expense_types.name
+  - inventory_invoice_items.name
+  - inventory_payment_types.name
+
+PRIMARY KEYS:
+  - All tables: id (UUID with DEFAULT uuid_generate_v4())
+
+================================================================================
+EXTENSION DEPENDENCIES
+================================================================================
+
+- uuid-ossp (for uuid_generate_v4() function)
+
+================================================================================
+FILE REFERENCES
+================================================================================
+
+This schema defines the complete database structure for:
+  - Bookings management system
+  - Revenue and invoicing tracking
+  - Expense management
+  - Inventory/master data management
+  - User authentication and role-based access
+
+See DATABASE_SETUP_GUIDE.md for deployment instructions.
+See SETUP_SCHEMA.sql for complete DDL statements.
+See SEED_DATA.sql for initial data load.
+
+================================================================================

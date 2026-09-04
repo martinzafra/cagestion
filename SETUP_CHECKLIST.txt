@@ -1,0 +1,345 @@
+================================================================================
+CASA AMIGA - DATABASE SETUP EXECUTION CHECKLIST
+================================================================================
+
+Status: READY FOR DEPLOYMENT
+Date Prepared: September 4, 2026
+Project: sajrwsfpvkitqubvzotc
+
+================================================================================
+PRE-DEPLOYMENT VERIFICATION
+================================================================================
+
+[✓] SETUP_SCHEMA.sql
+    - Location: C:\Users\MartínZafraFrunet\OneDrive - FRUNET\...\APPWEB CA GESTION\
+    - Size: 10,643 bytes (267 lines)
+    - Content: Complete schema with 10 tables, 7 enums, 20+ RLS policies
+    - Status: READY
+
+[✓] SEED_DATA.sql
+    - Location: C:\Users\MartínZafraFrunet\OneDrive - FRUNET\...\APPWEB CA GESTION\
+    - Size: 605 bytes (6 lines)
+    - Content: Initial inventory data (2 agents, 5 apartments, 4 platforms, etc.)
+    - Status: READY
+
+[✓] DATABASE_SETUP_GUIDE.md
+    - Location: C:\Users\MartínZafraFrunet\OneDrive - FRUNET\...\APPWEB CA GESTION\
+    - Content: Step-by-step instructions for 3 deployment methods
+    - Status: READY
+
+[✓] SCHEMA_REFERENCE.txt
+    - Location: C:\Users\MartínZafraFrunet\OneDrive - FRUNET\...\APPWEB CA GESTION\
+    - Content: Complete technical reference of all tables and fields
+    - Status: READY
+
+================================================================================
+DEPLOYMENT STEP-BY-STEP (Choose ONE Method Below)
+================================================================================
+
+METHOD 1: SUPABASE DASHBOARD (RECOMMENDED - Fastest)
+====================================================
+
+Step 1: Access Supabase Dashboard
+  [ ] Open: https://app.supabase.com
+  [ ] Log in with your Supabase account
+  [ ] Navigate to: Projects
+
+Step 2: Select Project
+  [ ] Click on project: sajrwsfpvkitqubvzotc
+  [ ] Verify you're in the correct project
+
+Step 3: Execute Schema
+  [ ] Go to: SQL Editor (left sidebar)
+  [ ] Click: New Query
+  [ ] Open file: SETUP_SCHEMA.sql
+  [ ] Select all and copy contents (Ctrl+A, Ctrl+C)
+  [ ] Paste into SQL editor (Ctrl+V)
+  [ ] Click: Run button (bottom right)
+  [ ] Wait for: "Command executed successfully" message
+  [ ] Expected time: 2-5 seconds
+  [ ] Check: Query logs show no errors
+
+Step 4: Verify Tables Created
+  [ ] Click: Database (left sidebar)
+  [ ] Click: Tables
+  [ ] Verify you see these 10 tables:
+      [ ] bookings
+      [ ] expenses
+      [ ] inventory_agents
+      [ ] inventory_apartments
+      [ ] inventory_expense_types
+      [ ] inventory_invoice_items
+      [ ] inventory_payment_types
+      [ ] inventory_platforms
+      [ ] revenue_invoicing
+      [ ] users
+
+Step 5: Execute Seed Data
+  [ ] Go to: SQL Editor
+  [ ] Click: New Query (creates fresh query panel)
+  [ ] Open file: SEED_DATA.sql
+  [ ] Copy and paste all contents
+  [ ] Click: Run
+  [ ] Wait for: Success message
+  [ ] Expected rows inserted: 23 rows total
+
+Step 6: Verify Seed Data
+  [ ] Go to: Database > Tables
+  [ ] Click: inventory_agents
+      [ ] Verify 2 rows: BM, KW
+  [ ] Click: inventory_apartments
+      [ ] Verify 5 rows: Barbarita, TMB, Catamaran, Cas Artur, Alexandrite
+  [ ] Click: inventory_platforms
+      [ ] Verify 4 rows: Bookings, Airbnb, Idealista, Organic
+  [ ] Click: inventory_expense_types
+      [ ] Verify 5 rows: Cleaning, Laundry, Supplies, Tax, Other
+  [ ] Click: inventory_invoice_items
+      [ ] Verify 3 rows: Commission, Cleaning&Laundry, Other
+  [ ] Click: inventory_payment_types
+      [ ] Verify 4 rows: Cash, Transfer, Platform, NA
+
+[ ] DATABASE DEPLOYMENT COMPLETE!
+
+
+METHOD 2: SUPABASE CLI (Alternative)
+======================================
+
+Prerequisites:
+  [ ] Node.js installed
+  [ ] Supabase CLI installed: npm install -g supabase
+
+Step 1: Authenticate CLI
+  [ ] Open terminal in project directory
+  [ ] Run: supabase login
+  [ ] Go to: https://app.supabase.com
+  [ ] Click: Account (top right)
+  [ ] Click: Access Tokens
+  [ ] Generate or copy existing access token
+  [ ] Paste token when prompted in terminal
+
+Step 2: Execute Schema
+  [ ] Run: supabase db execute --project-id sajrwsfpvkitqubvzotc < SETUP_SCHEMA.sql
+  [ ] Wait for: Command to complete
+  [ ] Check: No errors in output
+
+Step 3: Execute Seed Data
+  [ ] Run: supabase db execute --project-id sajrwsfpvkitqubvzotc < SEED_DATA.sql
+  [ ] Wait for: Command to complete
+  [ ] Check: No errors in output
+
+Step 4: Verify Deployment
+  [ ] Run: supabase db list-tables --project-id sajrwsfpvkitqubvzotc
+  [ ] Verify: All 10 tables listed
+
+[ ] DATABASE DEPLOYMENT COMPLETE!
+
+
+METHOD 3: POSTGRESQL CLIENT (psql)
+===================================
+
+Prerequisites:
+  [ ] PostgreSQL client installed (psql)
+  [ ] Connection credentials from Supabase dashboard
+
+Step 1: Get Connection String
+  [ ] Go to: https://app.supabase.com
+  [ ] Select project: sajrwsfpvkitqubvzotc
+  [ ] Go to: Project Settings > Database
+  [ ] Find: Connection string section
+  [ ] Copy: The PostgreSQL connection string
+  [ ] Note: Connection string format is: postgresql://user:password@host:port/database
+
+Step 2: Execute Schema
+  [ ] Open terminal in project directory
+  [ ] Run: psql "your-connection-string" < SETUP_SCHEMA.sql
+  [ ] Replace "your-connection-string" with copied value
+  [ ] Wait for: Command to complete
+  [ ] Check: No errors
+
+Step 3: Execute Seed Data
+  [ ] Run: psql "your-connection-string" < SEED_DATA.sql
+  [ ] Wait for: Command to complete
+
+Step 4: Verify
+  [ ] Run: psql "your-connection-string" -c "SELECT * FROM information_schema.tables WHERE table_schema = 'public';"
+  [ ] Verify: All 10 tables listed
+
+[ ] DATABASE DEPLOYMENT COMPLETE!
+
+================================================================================
+POST-DEPLOYMENT TASKS
+================================================================================
+
+Step 1: Create Users (Supabase Auth)
+  [ ] Go to: Authentication > Users (left sidebar)
+  [ ] Click: Add new user
+  [ ] Create Admin user:
+      Email: admin@example.com
+      Password: (set secure password)
+      [ ] Save
+  [ ] Create Agent 1:
+      Email: bm@example.com
+      Password: (set secure password)
+      [ ] Save
+  [ ] Create Agent 2:
+      Email: kw@example.com
+      Password: (set secure password)
+      [ ] Save
+
+Step 2: Set User Roles
+  [ ] Go to: Database > Query
+  [ ] Execute for each user:
+      UPDATE users SET role = 'admin' WHERE email = 'admin@example.com';
+      UPDATE users SET role = 'agent' WHERE email = 'bm@example.com';
+      UPDATE users SET role = 'agent', agent_name = 'BM' WHERE email = 'bm@example.com';
+      UPDATE users SET role = 'agent', agent_name = 'KW' WHERE email = 'kw@example.com';
+
+Step 3: Update Application Environment Variables
+  [ ] Open: .env.local (or equivalent)
+  [ ] Set:
+      NEXT_PUBLIC_SUPABASE_URL=https://sajrwsfpvkitqubvzotc.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY=(your anon key from Supabase dashboard)
+  [ ] Save file
+
+Step 4: Start Application
+  [ ] Open terminal in project root
+  [ ] Run: npm install (if needed)
+  [ ] Run: npm run dev
+  [ ] Open: http://localhost:3000
+  [ ] Test: Login with one of the created users
+
+Step 5: Test Core Features
+  [ ] Login as admin@example.com
+  [ ] Navigate to: Bookings
+  [ ] Create test booking:
+      [ ] Fill in: Guest name, apartment, dates
+      [ ] Verify: Nights auto-calculated
+      [ ] Submit booking
+      [ ] Verify: Booking appears in list
+  [ ] Navigate to: Inventory (admin only)
+  [ ] Verify: Can see all 6 inventory tables with seed data
+  [ ] Navigate to: Revenue
+  [ ] Navigate to: Expenses
+  [ ] Create test revenue entry
+  [ ] Create test expense entry
+  [ ] Verify: Totals calculated correctly
+
+[ ] FULL DEPLOYMENT AND TESTING COMPLETE!
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Issue: "Table already exists" error
+  Cause: Schema partially or fully already applied
+  Solution:
+    1. Go to: SQL Editor > New Query
+    2. Run: DROP TABLE IF EXISTS [table_name] CASCADE;
+    3. Drop all tables: bookings, expenses, revenue_invoicing, users, inventory_*
+    4. Run: DROP TYPE IF EXISTS [type_name];
+    5. Drop all enums: user_role, booking_status, price_basis, task_status, revenue_type, expense_type_enum, yes_no_na
+    6. Re-run SETUP_SCHEMA.sql
+
+Issue: "Permission denied" error
+  Cause: User doesn't have admin privileges
+  Solution:
+    1. Use admin Supabase account
+    2. Or contact Supabase support to elevate permissions
+    3. Verify you're not using anon key for direct queries
+
+Issue: Seed data not inserting
+  Cause: Schema not created yet, or foreign keys missing
+  Solution:
+    1. Verify SETUP_SCHEMA.sql ran successfully
+    2. Re-run SETUP_SCHEMA.sql first
+    3. Then run SEED_DATA.sql
+
+Issue: Can't find project
+  Cause: Wrong project ID or not logged in
+  Solution:
+    1. Verify project ID: sajrwsfpvkitqubvzotc
+    2. Log in to Supabase: https://app.supabase.com
+    3. Double-check project is visible in dashboard
+
+Issue: CLI authentication fails
+  Cause: Access token missing or expired
+  Solution:
+    1. Run: supabase logout
+    2. Run: supabase login
+    3. Generate fresh access token from Supabase dashboard
+    4. Paste when prompted
+
+Issue: Generated columns not calculating
+  Cause: Column type or formula incorrect
+  Solution:
+    1. Go to: Database > Tables
+    2. Click on affected table
+    3. Check: Column definition shows GENERATED ALWAYS AS ... STORED
+    4. If missing, run SETUP_SCHEMA.sql again
+
+================================================================================
+ROLLBACK PROCEDURE (if needed)
+================================================================================
+
+To completely remove all Casa Amiga tables:
+
+  [ ] Go to: SQL Editor > New Query
+  [ ] Execute in this order (one at a time):
+
+      DROP TABLE IF EXISTS revenue_invoicing CASCADE;
+      DROP TABLE IF EXISTS expenses CASCADE;
+      DROP TABLE IF EXISTS bookings CASCADE;
+      DROP TABLE IF EXISTS users CASCADE;
+      DROP TABLE IF EXISTS inventory_agents CASCADE;
+      DROP TABLE IF EXISTS inventory_apartments CASCADE;
+      DROP TABLE IF EXISTS inventory_platforms CASCADE;
+      DROP TABLE IF EXISTS inventory_expense_types CASCADE;
+      DROP TABLE IF EXISTS inventory_invoice_items CASCADE;
+      DROP TABLE IF EXISTS inventory_payment_types CASCADE;
+
+      DROP TYPE IF EXISTS user_role CASCADE;
+      DROP TYPE IF EXISTS booking_status CASCADE;
+      DROP TYPE IF EXISTS price_basis CASCADE;
+      DROP TYPE IF EXISTS task_status CASCADE;
+      DROP TYPE IF EXISTS revenue_type CASCADE;
+      DROP TYPE IF EXISTS expense_type_enum CASCADE;
+      DROP TYPE IF EXISTS yes_no_na CASCADE;
+
+  [ ] Verify: All tables and enums removed from Database > Tables
+
+  Note: This action CANNOT be undone. All data will be lost.
+
+================================================================================
+SUCCESS CRITERIA
+================================================================================
+
+Deployment is complete when:
+
+  [✓] All 10 tables created
+  [✓] All 7 enum types created
+  [✓] All 8 indexes created
+  [✓] All 20+ RLS policies created
+  [✓] Seed data inserted: 23 total rows
+  [✓] No error messages in logs
+  [✓] Application starts without database errors
+  [✓] Users can log in with created credentials
+  [✓] Admin can view Inventory tab
+  [✓] Users can create bookings
+  [✓] Calculations (nights, total amount, commission) work
+  [✓] Revenue and expense tracking functions
+  [✓] All generated columns populate correctly
+
+================================================================================
+DEPLOYMENT COMPLETE WHEN:
+- Schema file: SETUP_SCHEMA.sql executed successfully
+- Seed file: SEED_DATA.sql executed successfully
+- All 10 tables verified in Supabase Dashboard
+- All 23 seed rows verified in inventory tables
+- Application environment variables updated
+- Test user created and can log in
+- Test booking created and calculated correctly
+================================================================================
+
+Contact: martin@frunet.net
+Created: September 4, 2026
+Version: 1.0
