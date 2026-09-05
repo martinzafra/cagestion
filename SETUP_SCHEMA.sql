@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   guest_comments TEXT,
   price_basis price_basis DEFAULT 'DAY',
   daily_price DECIMAL(10, 2) NOT NULL,
+  total_rent DECIMAL(10, 2),
   cleaning_charge DECIMAL(10, 2) DEFAULT 0,
   other_charge DECIMAL(10, 2) DEFAULT 0,
   guest_total_amount DECIMAL(10, 2),

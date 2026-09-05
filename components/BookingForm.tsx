@@ -32,6 +32,7 @@ interface FormData {
   comments: string;
   guest_comments: string;
   daily_price: number;
+  total_rent: number | null;
   cleaning_charge: number;
   other_charge: number;
   guest_total_amount: number | null;
@@ -76,6 +77,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
     comments: '',
     guest_comments: '',
     daily_price: 0,
+    total_rent: null,
     cleaning_charge: 0,
     other_charge: 0,
     guest_total_amount: null,
@@ -101,18 +103,17 @@ const BookingForm: React.FC<BookingFormProps> = ({
       setNights(calculatedNights);
 
       if (priceMode === 'daily') {
-        const total =
-          formData.daily_price * calculatedNights +
-          formData.cleaning_charge +
-          formData.other_charge;
-        setFormData((prev) => ({ ...prev, guest_total_amount: total }));
+        const rent = formData.daily_price * calculatedNights;
+        const total = rent + formData.cleaning_charge + formData.other_charge;
+        setFormData((prev) => ({ ...prev, total_rent: rent, guest_total_amount: total }));
       } else {
-        const total = formData.guest_total_amount || 0;
-        const remaining = total - formData.cleaning_charge - formData.other_charge;
-        const perNight = calculatedNights > 0 ? remaining / calculatedNights : 0;
+        const rent = formData.total_rent || 0;
+        const perNight = calculatedNights > 0 ? rent / calculatedNights : 0;
+        const total = rent + formData.cleaning_charge + formData.other_charge;
         setFormData((prev) => ({
           ...prev,
           daily_price: Math.round(perNight * 100) / 100,
+          guest_total_amount: total,
         }));
       }
     }
@@ -120,9 +121,9 @@ const BookingForm: React.FC<BookingFormProps> = ({
     formData.check_in_date,
     formData.check_out_date,
     formData.daily_price,
+    formData.total_rent,
     formData.cleaning_charge,
     formData.other_charge,
-    formData.guest_total_amount,
     priceMode,
   ]);
 
@@ -574,12 +575,12 @@ const BookingForm: React.FC<BookingFormProps> = ({
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
-            Total Amount
+            Total Rent
           </button>
         </div>
       </div>
 
-      {/* Row 6: Pricing */}
+      {/* Row 6: Rent pricing */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="label">
@@ -597,6 +598,21 @@ const BookingForm: React.FC<BookingFormProps> = ({
           />
         </div>
         <div>
+          <label className="label">
+            Total Rent {priceMode === 'total' ? '*' : '(calculated)'}
+          </label>
+          <input
+            type="number"
+            name="total_rent"
+            value={formData.total_rent ?? ''}
+            onChange={handleChange}
+            className={`input ${priceMode === 'daily' ? 'bg-gray-100' : ''}`}
+            step="0.01"
+            required={priceMode === 'total'}
+            disabled={priceMode === 'daily'}
+          />
+        </div>
+        <div>
           <label className="label">Cleaning Charge</label>
           <input
             type="number"
@@ -607,6 +623,10 @@ const BookingForm: React.FC<BookingFormProps> = ({
             step="0.01"
           />
         </div>
+      </div>
+
+      {/* Row 7: Total Amount */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="label">Other Charge</label>
           <input
@@ -618,25 +638,15 @@ const BookingForm: React.FC<BookingFormProps> = ({
             step="0.01"
           />
         </div>
-      </div>
-
-      {/* Row 7: Total Amount */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="label">
-            Guest Total Amount {priceMode === 'total' ? '*' : '(calculated)'}
-          </label>
+          <label className="label">Guest Total Amount (calculated)</label>
           <input
             type="number"
             name="guest_total_amount"
             value={formData.guest_total_amount ?? ''}
-            onChange={handleChange}
-            disabled={priceMode === 'daily'}
-            className={`input font-bold text-lg ${
-              priceMode === 'daily' ? 'bg-gray-100' : ''
-            }`}
+            disabled
+            className="input font-bold text-lg bg-gray-100"
             step="0.01"
-            required={priceMode === 'total'}
           />
         </div>
         <div>

@@ -45,6 +45,7 @@ export type Database = {
           guest_comments: string | null;
           price_basis: 'DAY' | 'WEEK' | 'MONTH';
           daily_price: number;
+          total_rent: number | null;
           cleaning_charge: number;
           other_charge: number;
           guest_total_amount: number | null;
