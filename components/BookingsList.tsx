@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { formatDate, formatCurrency } from '@/lib/calculations';
-import { Edit2, Trash2 } from 'lucide-react';
+import { Edit2, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 import StatusBadge from '@/components/StatusBadge';
@@ -10,10 +10,22 @@ import StatusBadge from '@/components/StatusBadge';
 interface BookingsListProps {
   bookings: any[];
   onRefresh: () => void;
+  onEdit: (id: string) => void;
 }
 
-const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh }) => {
+type SortColumn =
+  | 'guest_name'
+  | 'apartment'
+  | 'check_in_date'
+  | 'check_out_date'
+  | 'nights'
+  | 'guest_total_amount'
+  | 'status';
+
+const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this booking?')) return;
@@ -32,30 +44,88 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh }) => {
     }
   };
 
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn !== column) {
+      setSortColumn(column);
+      setSortDirection('asc');
+    } else if (sortDirection === 'asc') {
+      setSortDirection('desc');
+    } else {
+      setSortColumn(null);
+    }
+  };
+
+  const getSortValue = (booking: any, column: SortColumn) => {
+    switch (column) {
+      case 'guest_name':
+        return booking.guest_name?.toLowerCase() || '';
+      case 'apartment':
+        return booking.apartment?.name?.toLowerCase() || '';
+      case 'check_in_date':
+        return booking.check_in_date || '';
+      case 'check_out_date':
+        return booking.check_out_date || '';
+      case 'nights':
+        return booking.nights || 0;
+      case 'guest_total_amount':
+        return booking.guest_total_amount || 0;
+      case 'status':
+        return booking.status || '';
+      default:
+        return '';
+    }
+  };
+
+  const sortedBookings = sortColumn
+    ? [...bookings].sort((a, b) => {
+        const va = getSortValue(a, sortColumn);
+        const vb = getSortValue(b, sortColumn);
+        if (va < vb) return sortDirection === 'asc' ? -1 : 1;
+        if (va > vb) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      })
+    : bookings;
+
+  const SortableHeader: React.FC<{ column: SortColumn; children: React.ReactNode }> = ({
+    column,
+    children,
+  }) => (
+    <th
+      className="cursor-pointer select-none hover:bg-gray-200"
+      onClick={() => handleSort(column)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {children}
+        {sortColumn === column &&
+          (sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+      </span>
+    </th>
+  );
+
   return (
     <div className="card overflow-x-auto">
       <table className="table">
         <thead>
           <tr>
-            <th>Guest</th>
-            <th>Apartment</th>
-            <th>Check-in</th>
-            <th>Check-out</th>
-            <th>Nights</th>
-            <th>Total</th>
-            <th>Status</th>
+            <SortableHeader column="guest_name">Guest</SortableHeader>
+            <SortableHeader column="apartment">Apartment</SortableHeader>
+            <SortableHeader column="check_in_date">Check-in</SortableHeader>
+            <SortableHeader column="check_out_date">Check-out</SortableHeader>
+            <SortableHeader column="nights">Nights</SortableHeader>
+            <SortableHeader column="guest_total_amount">Total</SortableHeader>
+            <SortableHeader column="status">Status</SortableHeader>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {bookings.length === 0 ? (
+          {sortedBookings.length === 0 ? (
             <tr>
               <td colSpan={8} className="text-center py-8 text-gray-500">
                 No bookings found
               </td>
             </tr>
           ) : (
-            bookings.map((booking) => (
+            sortedBookings.map((booking) => (
               <tr
                 key={booking.id}
                 className="cursor-pointer hover:bg-gray-50"
@@ -75,7 +145,11 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh }) => {
                   <StatusBadge status={booking.status} />
                 </td>
                 <td onClick={(e) => e.stopPropagation()}>
-                  <button className="p-1 hover:bg-blue-100 rounded" title="Edit">
+                  <button
+                    onClick={() => onEdit(booking.id)}
+                    className="p-1 hover:bg-blue-100 rounded"
+                    title="Edit"
+                  >
                     <Edit2 size={16} className="text-blue-600" />
                   </button>
                   <button

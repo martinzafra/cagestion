@@ -278,3 +278,38 @@ CREATE POLICY "Inventory payment types admin insert" ON inventory_payment_types 
 CREATE POLICY "Inventory payment types admin update" ON inventory_payment_types FOR UPDATE USING (
   EXISTS (SELECT 1 FROM users WHERE users.id = auth.uid() AND role = 'admin')
 );
+
+-- Agent <-> Apartment permissions: an agent only sees/manages bookings,
+-- revenue, and expenses for apartments they're enabled for. Admins are
+-- unrestricted. See can_access_apartment() and the SELECT/INSERT/UPDATE
+-- policies on bookings/revenue_invoicing/expenses.
+CREATE TABLE IF NOT EXISTS inventory_agent_apartments (
+  agent_id UUID NOT NULL REFERENCES inventory_agents(id) ON DELETE CASCADE,
+  apartment_id UUID NOT NULL REFERENCES inventory_apartments(id) ON DELETE CASCADE,
+  PRIMARY KEY (agent_id, apartment_id)
+);
+ALTER TABLE inventory_agent_apartments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Agent apartments read" ON inventory_agent_apartments FOR SELECT USING (is_registered_user());
+CREATE POLICY "Agent apartments admin insert" ON inventory_agent_apartments FOR INSERT WITH CHECK (get_my_role() = 'admin');
+CREATE POLICY "Agent apartments admin delete" ON inventory_agent_apartments FOR DELETE USING (get_my_role() = 'admin');
+
+CREATE OR REPLACE FUNCTION can_access_apartment(p_apartment_id UUID)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT
+    CASE
+      WHEN get_my_role() = 'admin' THEN true
+      ELSE EXISTS (
+        SELECT 1
+        FROM inventory_agent_apartments iaa
+        JOIN inventory_agents ia ON ia.id = iaa.agent_id
+        JOIN users u ON u.agent_name = ia.name
+        WHERE u.id = auth.uid() AND iaa.apartment_id = p_apartment_id
+      )
+    END;
+$$;
+GRANT EXECUTE ON FUNCTION can_access_apartment(UUID) TO authenticated;

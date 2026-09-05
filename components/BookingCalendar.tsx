@@ -17,22 +17,17 @@ function toDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 const BookingCalendar: React.FC<BookingCalendarProps> = ({
   bookings,
   apartments,
   selectedApartmentIds,
 }) => {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [baseMonth, setBaseMonth] = useState(new Date());
+  const todayKey = toDateKey(new Date());
 
   const colorMap = getApartmentColorMap(apartments);
-
-  const getDaysInMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  };
-
-  const getFirstDayOfMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-  };
 
   const getBookingsForDate = (date: Date) => {
     const dateKey = toDateKey(date);
@@ -43,102 +38,66 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({
     });
   };
 
-  const days: (Date | null)[] = [];
-  const daysInMonth = getDaysInMonth(currentMonth);
-  const firstDay = getFirstDayOfMonth(currentMonth);
-
-  for (let i = 0; i < firstDay; i++) {
-    days.push(null);
-  }
-  for (let i = 1; i <= daysInMonth; i++) {
-    days.push(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), i));
-  }
-
-  const monthName = currentMonth.toLocaleDateString('en-US', {
-    month: 'long',
-    year: 'numeric',
-  });
-
   const legendApartments = apartments.filter((a) =>
     selectedApartmentIds.includes(a.id)
   );
 
-  return (
-    <div className="space-y-4">
-      {/* Month Navigation */}
-      <div className="flex justify-between items-center">
-        <h3 className="text-xl font-bold">{monthName}</h3>
-        <div className="flex gap-2">
-          <button
-            onClick={() =>
-              setCurrentMonth(
-                new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1)
-              )
-            }
-            className="p-2 hover:bg-gray-100 rounded"
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <button
-            onClick={() => setCurrentMonth(new Date())}
-            className="px-3 py-1 text-sm hover:bg-gray-100 rounded"
-          >
-            Today
-          </button>
-          <button
-            onClick={() =>
-              setCurrentMonth(
-                new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1)
-              )
-            }
-            className="p-2 hover:bg-gray-100 rounded"
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
-      </div>
+  const renderMonth = (monthDate: Date) => {
+    const daysInMonth = new Date(
+      monthDate.getFullYear(),
+      monthDate.getMonth() + 1,
+      0
+    ).getDate();
+    const firstDay = new Date(
+      monthDate.getFullYear(),
+      monthDate.getMonth(),
+      1
+    ).getDay();
 
-      {/* Legend */}
-      {legendApartments.length > 0 && (
-        <div className="flex flex-wrap gap-3">
-          {legendApartments.map((apt) => (
-            <div key={apt.id} className="flex items-center gap-1.5 text-sm">
-              <span
-                className={`w-3 h-3 rounded-full inline-block ${
-                  colorMap.get(apt.id)?.dot || 'bg-gray-400'
-                }`}
-              ></span>
-              <span className="text-gray-700">{apt.name}</span>
-            </div>
-          ))}
-        </div>
-      )}
+    const days: (Date | null)[] = [];
+    for (let i = 0; i < firstDay; i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(new Date(monthDate.getFullYear(), monthDate.getMonth(), i));
+    }
 
-      {/* Calendar Grid */}
-      <div className="border rounded-lg overflow-hidden">
+    const monthName = monthDate.toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
+    });
+
+    return (
+      <div key={monthName} className="border rounded-lg overflow-hidden">
+        <div className="bg-gray-100 px-3 py-2 font-semibold text-center">
+          {monthName}
+        </div>
         <div className="grid grid-cols-7 gap-px bg-gray-200">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-            <div
-              key={day}
-              className="bg-white p-2 text-center font-semibold text-sm"
-            >
+          {WEEKDAYS.map((day) => (
+            <div key={day} className="bg-white p-1.5 text-center font-semibold text-xs">
               {day}
             </div>
           ))}
         </div>
-
         <div className="grid grid-cols-7 gap-px bg-gray-200 p-px">
           {days.map((date, idx) => {
             const dayBookings = date ? getBookingsForDate(date) : [];
+            const isToday = date && toDateKey(date) === todayKey;
 
             return (
               <div
                 key={idx}
-                className={`min-h-24 p-1 text-sm ${date ? 'bg-white' : 'bg-gray-50'}`}
+                className={`min-h-20 p-1 text-sm ${date ? 'bg-white' : 'bg-gray-50'} ${
+                  isToday ? 'ring-2 ring-inset ring-blue-500' : ''
+                }`}
               >
                 {date && (
                   <>
-                    <div className="font-semibold text-gray-700 text-xs mb-1">
+                    <div
+                      className={`font-semibold text-xs mb-1 ${
+                        isToday
+                          ? 'inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white'
+                          : 'text-gray-700'
+                      }`}
+                    >
                       {date.getDate()}
                     </div>
                     <div className="space-y-0.5">
@@ -164,11 +123,63 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({
           })}
         </div>
       </div>
+    );
+  };
 
-      {legendApartments.length === 0 && (
+  const months = [0, 1, 2].map(
+    (offset) => new Date(baseMonth.getFullYear(), baseMonth.getMonth() + offset, 1)
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* Navigation */}
+      <div className="flex justify-end items-center gap-2">
+        <button
+          onClick={() =>
+            setBaseMonth(new Date(baseMonth.getFullYear(), baseMonth.getMonth() - 1))
+          }
+          className="p-2 hover:bg-gray-100 rounded"
+        >
+          <ChevronLeft size={20} />
+        </button>
+        <button
+          onClick={() => setBaseMonth(new Date())}
+          className="px-3 py-1 text-sm hover:bg-gray-100 rounded"
+        >
+          Today
+        </button>
+        <button
+          onClick={() =>
+            setBaseMonth(new Date(baseMonth.getFullYear(), baseMonth.getMonth() + 1))
+          }
+          className="p-2 hover:bg-gray-100 rounded"
+        >
+          <ChevronRight size={20} />
+        </button>
+      </div>
+
+      {/* Legend */}
+      {legendApartments.length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          {legendApartments.map((apt) => (
+            <div key={apt.id} className="flex items-center gap-1.5 text-sm">
+              <span
+                className={`w-3 h-3 rounded-full inline-block ${
+                  colorMap.get(apt.id)?.dot || 'bg-gray-400'
+                }`}
+              ></span>
+              <span className="text-gray-700">{apt.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {legendApartments.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           Select at least one apartment to see bookings
         </div>
+      ) : (
+        <div className="space-y-6">{months.map((m) => renderMonth(m))}</div>
       )}
     </div>
   );

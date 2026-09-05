@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { calculateGuestTotalAmount, calculateNights } from '@/lib/calculations';
+import { calculateNights } from '@/lib/calculations';
 import toast from 'react-hot-toast';
 
 interface BookingFormProps {
@@ -31,7 +31,6 @@ interface FormData {
   payment_type_id: string | null;
   comments: string;
   guest_comments: string;
-  price_basis: 'DAY' | 'WEEK' | 'MONTH';
   daily_price: number;
   cleaning_charge: number;
   other_charge: number;
@@ -76,7 +75,6 @@ const BookingForm: React.FC<BookingFormProps> = ({
     payment_type_id: null,
     comments: '',
     guest_comments: '',
-    price_basis: 'DAY',
     daily_price: 0,
     cleaning_charge: 0,
     other_charge: 0,
@@ -103,13 +101,10 @@ const BookingForm: React.FC<BookingFormProps> = ({
       setNights(calculatedNights);
 
       if (priceMode === 'daily') {
-        const total = calculateGuestTotalAmount(
-          formData.daily_price,
-          formData.price_basis,
-          calculatedNights,
-          formData.cleaning_charge,
-          formData.other_charge
-        );
+        const total =
+          formData.daily_price * calculatedNights +
+          formData.cleaning_charge +
+          formData.other_charge;
         setFormData((prev) => ({ ...prev, guest_total_amount: total }));
       } else {
         const total = formData.guest_total_amount || 0;
@@ -125,7 +120,6 @@ const BookingForm: React.FC<BookingFormProps> = ({
     formData.check_in_date,
     formData.check_out_date,
     formData.daily_price,
-    formData.price_basis,
     formData.cleaning_charge,
     formData.other_charge,
     formData.guest_total_amount,
@@ -144,9 +138,42 @@ const BookingForm: React.FC<BookingFormProps> = ({
       );
 
       if (agentsRes.data) setAgents(agentsRes.data);
-      if (apartmentsRes.data) setApartments(apartmentsRes.data);
       if (platformsRes.data) setPlatforms(platformsRes.data);
       if (paymentRes.data) setPaymentTypes(paymentRes.data);
+
+      // Agents only see apartments they've been enabled for; admins see all.
+      let allowedApartments = apartmentsRes.data || [];
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session) {
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('role, agent_name')
+          .eq('id', session.user.id)
+          .single();
+
+        if (userRow?.role === 'agent' && userRow.agent_name) {
+          const { data: agentRow } = await supabase
+            .from('inventory_agents')
+            .select('id')
+            .eq('name', userRow.agent_name)
+            .single();
+
+          if (agentRow) {
+            const { data: allowedRows } = await supabase
+              .from('inventory_agent_apartments')
+              .select('apartment_id')
+              .eq('agent_id', agentRow.id);
+
+            const allowedIds = new Set((allowedRows || []).map((r) => r.apartment_id));
+            allowedApartments = allowedApartments.filter((a: any) => allowedIds.has(a.id));
+          }
+        }
+      }
+
+      setApartments(allowedApartments);
     } catch (error) {
       toast.error('Failed to load inventory data');
     }
@@ -553,21 +580,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
       </div>
 
       {/* Row 6: Pricing */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div>
-          <label className="label">Price Basis</label>
-          <select
-            name="price_basis"
-            value={formData.price_basis}
-            onChange={handleChange}
-            className="select"
-            disabled={priceMode === 'total'}
-          >
-            <option value="DAY">Day</option>
-            <option value="WEEK">Week</option>
-            <option value="MONTH">Month</option>
-          </select>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="label">
             Daily Price {priceMode === 'daily' ? '*' : '(calculated)'}

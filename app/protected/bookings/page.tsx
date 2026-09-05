@@ -14,6 +14,7 @@ type ViewMode = 'list' | 'calendar';
 export default function BookingsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [showForm, setShowForm] = useState(false);
+  const [editingBookingId, setEditingBookingId] = useState<string | undefined>(undefined);
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [apartments, setApartments] = useState<any[]>([]);
@@ -25,6 +26,8 @@ export default function BookingsPage() {
     agent_id: '',
     status: '',
     search: '',
+    dateFrom: '',
+    dateTo: '',
   });
 
   useEffect(() => {
@@ -87,10 +90,26 @@ export default function BookingsPage() {
     }
   };
 
-  const handleBookingCreated = () => {
+  const handleNewBooking = () => {
+    setEditingBookingId(undefined);
+    setShowForm((prev) => !prev);
+  };
+
+  const handleEditBooking = (id: string) => {
+    setEditingBookingId(id);
+    setShowForm(true);
+  };
+
+  const handleFormSuccess = () => {
     setShowForm(false);
+    setEditingBookingId(undefined);
     fetchBookings();
-    toast.success('Booking created successfully');
+    toast.success(editingBookingId ? 'Booking updated successfully' : 'Booking created successfully');
+  };
+
+  const handleFormCancel = () => {
+    setShowForm(false);
+    setEditingBookingId(undefined);
   };
 
   const filteredBookings = bookings.filter((b) => {
@@ -98,6 +117,8 @@ export default function BookingsPage() {
       return false;
     if (listFilters.agent_id && b.agent_id !== listFilters.agent_id) return false;
     if (listFilters.status && b.status !== listFilters.status) return false;
+    if (listFilters.dateFrom && b.check_in_date < listFilters.dateFrom) return false;
+    if (listFilters.dateTo && b.check_in_date > listFilters.dateTo) return false;
     if (listFilters.search) {
       const q = listFilters.search.toLowerCase();
       const matches =
@@ -123,10 +144,7 @@ export default function BookingsPage() {
           <h1 className="text-3xl font-bold text-gray-900">Bookings</h1>
           <p className="text-gray-600 mt-1">Manage accommodation reservations</p>
         </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="btn-primary flex items-center gap-2"
-        >
+        <button onClick={handleNewBooking} className="btn-primary flex items-center gap-2">
           <Plus size={18} />
           New Booking
         </button>
@@ -135,8 +153,9 @@ export default function BookingsPage() {
       {showForm && (
         <div className="card">
           <BookingForm
-            onSuccess={handleBookingCreated}
-            onCancel={() => setShowForm(false)}
+            bookingId={editingBookingId}
+            onSuccess={handleFormSuccess}
+            onCancel={handleFormCancel}
           />
         </div>
       )}
@@ -175,7 +194,7 @@ export default function BookingsPage() {
         <>
           {/* Filter line */}
           <div className="card">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               <select
                 value={listFilters.apartment_id}
                 onChange={(e) =>
@@ -217,6 +236,24 @@ export default function BookingsPage() {
                 <option value="CANCELLED">Cancelled</option>
               </select>
               <input
+                type="date"
+                title="Check-in from"
+                value={listFilters.dateFrom}
+                onChange={(e) =>
+                  setListFilters({ ...listFilters, dateFrom: e.target.value })
+                }
+                className="input"
+              />
+              <input
+                type="date"
+                title="Check-in to"
+                value={listFilters.dateTo}
+                onChange={(e) =>
+                  setListFilters({ ...listFilters, dateTo: e.target.value })
+                }
+                className="input"
+              />
+              <input
                 type="text"
                 placeholder="Search guest or reference..."
                 value={listFilters.search}
@@ -227,30 +264,31 @@ export default function BookingsPage() {
               />
             </div>
           </div>
-          <BookingsList bookings={filteredBookings} onRefresh={fetchBookings} />
+          <BookingsList
+            bookings={filteredBookings}
+            onRefresh={fetchBookings}
+            onEdit={handleEditBooking}
+          />
         </>
       ) : (
         <div className="card">
           <div className="mb-4">
             <label className="label">Filter by Apartment</label>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2">
               {apartments.map((apt) => {
                 const checked = calendarApartmentIds.includes(apt.id);
                 return (
                   <label
                     key={apt.id}
-                    className="flex items-center gap-1.5 text-sm cursor-pointer"
+                    className={`flex items-center gap-1.5 text-sm cursor-pointer px-2 py-1 rounded ${
+                      checked ? colorMap.get(apt.id)?.chip || 'bg-gray-100' : 'bg-gray-50 opacity-60'
+                    }`}
                   >
                     <input
                       type="checkbox"
                       checked={checked}
                       onChange={() => toggleCalendarApartment(apt.id)}
                     />
-                    <span
-                      className={`w-3 h-3 rounded-full inline-block ${
-                        colorMap.get(apt.id)?.dot || 'bg-gray-400'
-                      }`}
-                    ></span>
                     {apt.name}
                   </label>
                 );

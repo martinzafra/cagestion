@@ -21,6 +21,8 @@ export default function InventoryPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState('');
+  const [allAgents, setAllAgents] = useState<TabItem[]>([]);
+  const [agentApartments, setAgentApartments] = useState<Set<string>>(new Set());
 
   const tables: { [key in InventoryType]: string } = {
     agents: 'inventory_agents',
@@ -85,8 +87,60 @@ export default function InventoryPage() {
 
       if (error) throw error;
       setItems(data || []);
+
+      if (activeTab === 'apartments') {
+        fetchAgentApartments();
+      }
     } catch (error) {
       toast.error('Failed to fetch items');
+    }
+  };
+
+  const fetchAgentApartments = async () => {
+    try {
+      const [agentsRes, linksRes] = await Promise.all([
+        supabase.from('inventory_agents').select('*').order('name'),
+        supabase.from('inventory_agent_apartments').select('agent_id, apartment_id'),
+      ]);
+
+      if (agentsRes.data) setAllAgents(agentsRes.data);
+      if (linksRes.data) {
+        setAgentApartments(
+          new Set(linksRes.data.map((l: any) => `${l.agent_id}:${l.apartment_id}`))
+        );
+      }
+    } catch (error) {
+      toast.error('Failed to fetch agent permissions');
+    }
+  };
+
+  const toggleAgentApartment = async (agentId: string, apartmentId: string) => {
+    const key = `${agentId}:${apartmentId}`;
+    const isEnabled = agentApartments.has(key);
+
+    try {
+      if (isEnabled) {
+        const { error } = await supabase
+          .from('inventory_agent_apartments')
+          .delete()
+          .eq('agent_id', agentId)
+          .eq('apartment_id', apartmentId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('inventory_agent_apartments')
+          .insert([{ agent_id: agentId, apartment_id: apartmentId }]);
+        if (error) throw error;
+      }
+
+      setAgentApartments((prev) => {
+        const next = new Set(prev);
+        if (isEnabled) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update permission');
     }
   };
 
@@ -259,8 +313,9 @@ export default function InventoryPage() {
             {items.map((item) => (
               <div
                 key={item.id}
-                className="flex justify-between items-center p-4 border rounded-lg hover:bg-gray-50"
+                className="p-4 border rounded-lg hover:bg-gray-50"
               >
+              <div className="flex justify-between items-center">
                 {editingId === item.id ? (
                   <>
                     <input
@@ -312,6 +367,28 @@ export default function InventoryPage() {
                     </div>
                   </>
                 )}
+              </div>
+              {activeTab === 'apartments' && allAgents.length > 0 && (
+                <div className="mt-3 pt-3 border-t flex flex-wrap gap-3">
+                  <span className="text-xs text-gray-500 w-full">Enabled agents:</span>
+                  {allAgents.map((agent) => {
+                    const enabled = agentApartments.has(`${agent.id}:${item.id}`);
+                    return (
+                      <label
+                        key={agent.id}
+                        className="flex items-center gap-1.5 text-sm cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={enabled}
+                          onChange={() => toggleAgentApartment(agent.id, item.id)}
+                        />
+                        {agent.name}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
               </div>
             ))}
           </div>
