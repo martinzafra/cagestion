@@ -7,6 +7,7 @@ CREATE TYPE booking_status AS ENUM ('CONFIRMED', 'PENDING CONFIRMATION', 'CANCEL
 CREATE TYPE price_basis AS ENUM ('DAY', 'WEEK', 'MONTH');
 CREATE TYPE task_status AS ENUM ('TO BE DONE', 'DONE', 'NA');
 CREATE TYPE invoice_status AS ENUM ('TO BE DONE', 'SENT', 'NA');
+CREATE TYPE todo_status_enum AS ENUM ('CONFIRMED', 'CHECKED IN', 'CHECKED OUT');
 CREATE TYPE revenue_type AS ENUM ('INVOICE', 'COLLECTION');
 CREATE TYPE expense_type_enum AS ENUM ('INVOICE', 'PAYMENT');
 CREATE TYPE yes_no_na AS ENUM ('Y', 'N', 'NA');
@@ -93,7 +94,10 @@ CREATE TABLE IF NOT EXISTS bookings (
   other_charge DECIMAL(10, 2) DEFAULT 0,
   guest_total_amount DECIMAL(10, 2),
 
+  todo_status todo_status_enum DEFAULT 'CONFIRMED',
+
   police_registration task_status DEFAULT 'TO BE DONE',
+  police_registration_date DATE,
   platform_invoice invoice_status DEFAULT 'TO BE DONE',
   platform_invoice_date DATE,
   final_liquidation invoice_status DEFAULT 'TO BE DONE',

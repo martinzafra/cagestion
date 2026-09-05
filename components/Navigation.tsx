@@ -22,6 +22,7 @@ const Navigation: React.FC<NavigationProps> = ({ userRole = 'agent', userName })
 
   const navItems = [
     { href: '/protected/bookings', label: 'Bookings', public: true },
+    { href: '/protected/todo', label: 'To Do', public: true },
     { href: '/protected/revenue', label: 'Revenue & Invoicing', public: true },
     { href: '/protected/expenses', label: 'Expenses', public: true },
     { href: '/protected/reports', label: 'Reports', public: true },
