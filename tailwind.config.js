@@ -4,6 +4,7 @@ module.exports = {
     './app/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './lib/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
@@ -39,6 +40,13 @@ module.exports = {
           600: '#0A6A9A',
           700: '#085A85',
           800: '#085A85',
+        },
+        // Earthy brown, for apartment color-coding (calendar legend) — Tailwind
+        // has no built-in brown scale.
+        brown: {
+          100: '#E8DDD3',
+          500: '#8B5E3C',
+          800: '#5C3A21',
         },
       },
       fontFamily: {

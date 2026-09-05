@@ -111,7 +111,7 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({
                               color?.chip || 'bg-gray-100 text-gray-800'
                             }`}
                           >
-                            {b.guest_name}
+                            {b.apartment?.name || ''} - {b.guest_name}
                           </div>
                         );
                       })}
