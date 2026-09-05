@@ -232,16 +232,27 @@ const BookingForm: React.FC<BookingFormProps> = ({
         return;
       }
 
+      // Empty strings aren't valid for TIME/nullable columns - convert to null
+      const payload = {
+        ...formData,
+        check_in_time: formData.check_in_time || null,
+        check_out_time: formData.check_out_time || null,
+        platform_invoice_date: formData.platform_invoice_date || null,
+        final_liquidation_date: formData.final_liquidation_date || null,
+        deposit_amount: formData.deposit_amount || null,
+        payment_type_id: formData.payment_type_id || null,
+      };
+
       if (bookingId) {
         const { error } = await supabase
           .from('bookings')
-          .update(formData)
+          .update(payload)
           .eq('id', bookingId);
 
         if (error) throw error;
         toast.success('Booking updated successfully');
       } else {
-        const { error } = await supabase.from('bookings').insert([formData]);
+        const { error } = await supabase.from('bookings').insert([payload]);
 
         if (error) throw error;
         toast.success('Booking created successfully');
