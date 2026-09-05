@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, Lock } from 'lucide-react';
+import { Plus, Trash2, Lock, Pencil, Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 type InventoryType = 'agents' | 'apartments' | 'platforms' | 'expense_types' | 'invoice_items' | 'payment_types';
@@ -19,6 +19,8 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [newItemName, setNewItemName] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState('');
 
   const tables: { [key in InventoryType]: string } = {
     agents: 'inventory_agents',
@@ -106,6 +108,42 @@ export default function InventoryPage() {
       toast.success('Item added');
       setNewItemName('');
       setShowAddForm(false);
+      fetchItems();
+    } catch (error: any) {
+      if (error.message.includes('duplicate')) {
+        toast.error('This item already exists');
+      } else {
+        toast.error(error.message);
+      }
+    }
+  };
+
+  const handleStartEdit = (item: TabItem) => {
+    setEditingId(item.id);
+    setEditingValue(item.name);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditingValue('');
+  };
+
+  const handleSaveEdit = async (id: string) => {
+    if (!editingValue.trim()) {
+      toast.error('Item name is required');
+      return;
+    }
+
+    try {
+      const tableName = tables[activeTab];
+      const { error } = await supabase
+        .from(tableName)
+        .update({ name: editingValue.trim() })
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success('Item updated');
+      setEditingId(null);
       fetchItems();
     } catch (error: any) {
       if (error.message.includes('duplicate')) {
@@ -223,14 +261,57 @@ export default function InventoryPage() {
                 key={item.id}
                 className="flex justify-between items-center p-4 border rounded-lg hover:bg-gray-50"
               >
-                <span className="font-medium">{item.name}</span>
-                <button
-                  onClick={() => handleDeleteItem(item.id)}
-                  className="p-1 hover:bg-red-100 rounded"
-                  title="Delete"
-                >
-                  <Trash2 size={18} className="text-red-600" />
-                </button>
+                {editingId === item.id ? (
+                  <>
+                    <input
+                      type="text"
+                      value={editingValue}
+                      onChange={(e) => setEditingValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveEdit(item.id);
+                        if (e.key === 'Escape') handleCancelEdit();
+                      }}
+                      className="input flex-1 mr-2"
+                      autoFocus
+                    />
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleSaveEdit(item.id)}
+                        className="p-1 hover:bg-green-100 rounded"
+                        title="Save"
+                      >
+                        <Check size={18} className="text-green-600" />
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        className="p-1 hover:bg-gray-200 rounded"
+                        title="Cancel"
+                      >
+                        <X size={18} className="text-gray-600" />
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span className="font-medium">{item.name}</span>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleStartEdit(item)}
+                        className="p-1 hover:bg-blue-100 rounded"
+                        title="Edit"
+                      >
+                        <Pencil size={18} className="text-blue-600" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteItem(item.id)}
+                        className="p-1 hover:bg-red-100 rounded"
+                        title="Delete"
+                      >
+                        <Trash2 size={18} className="text-red-600" />
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>

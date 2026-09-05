@@ -6,6 +6,7 @@ import { Plus, Calendar, List } from 'lucide-react';
 import BookingForm from '@/components/BookingForm';
 import BookingsList from '@/components/BookingsList';
 import BookingCalendar from '@/components/BookingCalendar';
+import { getApartmentColorMap } from '@/lib/apartmentColors';
 import toast from 'react-hot-toast';
 
 type ViewMode = 'list' | 'calendar';
@@ -15,12 +16,21 @@ export default function BookingsPage() {
   const [showForm, setShowForm] = useState(false);
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedApartment, setSelectedApartment] = useState<string | null>(null);
   const [apartments, setApartments] = useState<any[]>([]);
+  const [agents, setAgents] = useState<any[]>([]);
+  const [calendarApartmentIds, setCalendarApartmentIds] = useState<string[]>([]);
+
+  const [listFilters, setListFilters] = useState({
+    apartment_id: '',
+    agent_id: '',
+    status: '',
+    search: '',
+  });
 
   useEffect(() => {
     fetchBookings();
     fetchApartments();
+    fetchAgents();
   }, []);
 
   const fetchBookings = async () => {
@@ -55,8 +65,25 @@ export default function BookingsPage() {
 
       if (error) throw error;
       setApartments(data || []);
+      setCalendarApartmentIds((prev) =>
+        prev.length === 0 ? (data || []).map((a) => a.id) : prev
+      );
     } catch (error) {
       toast.error('Failed to fetch apartments');
+    }
+  };
+
+  const fetchAgents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('inventory_agents')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setAgents(data || []);
+    } catch (error) {
+      toast.error('Failed to fetch agents');
     }
   };
 
@@ -64,6 +91,29 @@ export default function BookingsPage() {
     setShowForm(false);
     fetchBookings();
     toast.success('Booking created successfully');
+  };
+
+  const filteredBookings = bookings.filter((b) => {
+    if (listFilters.apartment_id && b.apartment_id !== listFilters.apartment_id)
+      return false;
+    if (listFilters.agent_id && b.agent_id !== listFilters.agent_id) return false;
+    if (listFilters.status && b.status !== listFilters.status) return false;
+    if (listFilters.search) {
+      const q = listFilters.search.toLowerCase();
+      const matches =
+        b.guest_name?.toLowerCase().includes(q) ||
+        b.booking_ref?.toLowerCase().includes(q);
+      if (!matches) return false;
+    }
+    return true;
+  });
+
+  const colorMap = getApartmentColorMap(apartments);
+
+  const toggleCalendarApartment = (id: string) => {
+    setCalendarApartmentIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   };
 
   return (
@@ -122,27 +172,95 @@ export default function BookingsPage() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
       ) : viewMode === 'list' ? (
-        <BookingsList bookings={bookings} onRefresh={fetchBookings} />
+        <>
+          {/* Filter line */}
+          <div className="card">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+              <select
+                value={listFilters.apartment_id}
+                onChange={(e) =>
+                  setListFilters({ ...listFilters, apartment_id: e.target.value })
+                }
+                className="select"
+              >
+                <option value="">All Apartments</option>
+                {apartments.map((apt) => (
+                  <option key={apt.id} value={apt.id}>
+                    {apt.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={listFilters.agent_id}
+                onChange={(e) =>
+                  setListFilters({ ...listFilters, agent_id: e.target.value })
+                }
+                className="select"
+              >
+                <option value="">All Agents</option>
+                {agents.map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={listFilters.status}
+                onChange={(e) =>
+                  setListFilters({ ...listFilters, status: e.target.value })
+                }
+                className="select"
+              >
+                <option value="">All Statuses</option>
+                <option value="CONFIRMED">Confirmed</option>
+                <option value="PENDING CONFIRMATION">Pending Confirmation</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
+              <input
+                type="text"
+                placeholder="Search guest or reference..."
+                value={listFilters.search}
+                onChange={(e) =>
+                  setListFilters({ ...listFilters, search: e.target.value })
+                }
+                className="input"
+              />
+            </div>
+          </div>
+          <BookingsList bookings={filteredBookings} onRefresh={fetchBookings} />
+        </>
       ) : (
         <div className="card">
           <div className="mb-4">
             <label className="label">Filter by Apartment</label>
-            <select
-              value={selectedApartment || ''}
-              onChange={(e) => setSelectedApartment(e.target.value || null)}
-              className="select"
-            >
-              <option value="">All Apartments</option>
-              {apartments.map((apt) => (
-                <option key={apt.id} value={apt.id}>
-                  {apt.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex flex-wrap gap-3">
+              {apartments.map((apt) => {
+                const checked = calendarApartmentIds.includes(apt.id);
+                return (
+                  <label
+                    key={apt.id}
+                    className="flex items-center gap-1.5 text-sm cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleCalendarApartment(apt.id)}
+                    />
+                    <span
+                      className={`w-3 h-3 rounded-full inline-block ${
+                        colorMap.get(apt.id)?.dot || 'bg-gray-400'
+                      }`}
+                    ></span>
+                    {apt.name}
+                  </label>
+                );
+              })}
+            </div>
           </div>
           <BookingCalendar
             bookings={bookings}
-            apartmentFilter={selectedApartment}
+            apartments={apartments}
+            selectedApartmentIds={calendarApartmentIds}
           />
         </div>
       )}

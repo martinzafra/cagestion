@@ -123,8 +123,7 @@ export default function RevenuePage() {
   };
 
   const getBookingDisplay = (booking: any) => {
-    const checkInDate = new Date(booking.check_in_date);
-    return `${booking.guest_name} - ${checkInDate.toLocaleDateString()} - ${booking.booking_ref}`;
+    return `${booking.guest_name} - ${formatDate(booking.check_in_date)} - ${booking.booking_ref}`;
   };
 
   return (

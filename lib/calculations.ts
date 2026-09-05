@@ -39,14 +39,20 @@ export function formatCurrency(amount: number): string {
 }
 
 export function formatDate(date: Date | string): string {
+  // Date-only strings (YYYY-MM-DD) are parsed directly to avoid
+  // timezone shifting the day when converted through a Date object.
   if (typeof date === 'string') {
+    const match = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const [, year, month, day] = match;
+      return `${day}/${month}/${year.slice(-2)}`;
+    }
     date = new Date(date);
   }
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = String(date.getFullYear()).slice(-2);
+  return `${day}/${month}/${year}`;
 }
 
 export function formatDateISO(date: Date | string): string {

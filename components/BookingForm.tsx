@@ -54,6 +54,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
   const [platforms, setPlatforms] = useState<any[]>([]);
   const [paymentTypes, setPaymentTypes] = useState<any[]>([]);
   const [nights, setNights] = useState(0);
+  const [priceMode, setPriceMode] = useState<'daily' | 'total'>('daily');
 
   const [formData, setFormData] = useState<FormData>({
     booking_date: new Date().toISOString().split('T')[0],
@@ -101,14 +102,24 @@ const BookingForm: React.FC<BookingFormProps> = ({
       const calculatedNights = calculateNights(checkIn, checkOut);
       setNights(calculatedNights);
 
-      const total = calculateGuestTotalAmount(
-        formData.daily_price,
-        formData.price_basis,
-        calculatedNights,
-        formData.cleaning_charge,
-        formData.other_charge
-      );
-      setFormData((prev) => ({ ...prev, guest_total_amount: total }));
+      if (priceMode === 'daily') {
+        const total = calculateGuestTotalAmount(
+          formData.daily_price,
+          formData.price_basis,
+          calculatedNights,
+          formData.cleaning_charge,
+          formData.other_charge
+        );
+        setFormData((prev) => ({ ...prev, guest_total_amount: total }));
+      } else {
+        const total = formData.guest_total_amount || 0;
+        const remaining = total - formData.cleaning_charge - formData.other_charge;
+        const perNight = calculatedNights > 0 ? remaining / calculatedNights : 0;
+        setFormData((prev) => ({
+          ...prev,
+          daily_price: Math.round(perNight * 100) / 100,
+        }));
+      }
     }
   }, [
     formData.check_in_date,
@@ -117,6 +128,8 @@ const BookingForm: React.FC<BookingFormProps> = ({
     formData.price_basis,
     formData.cleaning_charge,
     formData.other_charge,
+    formData.guest_total_amount,
+    priceMode,
   ]);
 
   const fetchInventory = async () => {
@@ -510,6 +523,35 @@ const BookingForm: React.FC<BookingFormProps> = ({
         </div>
       </div>
 
+      {/* Pricing Mode Toggle */}
+      <div>
+        <label className="label">Pricing Mode</label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setPriceMode('daily')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+              priceMode === 'daily'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            Daily Rate
+          </button>
+          <button
+            type="button"
+            onClick={() => setPriceMode('total')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+              priceMode === 'total'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            Total Amount
+          </button>
+        </div>
+      </div>
+
       {/* Row 6: Pricing */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
@@ -519,6 +561,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
             value={formData.price_basis}
             onChange={handleChange}
             className="select"
+            disabled={priceMode === 'total'}
           >
             <option value="DAY">Day</option>
             <option value="WEEK">Week</option>
@@ -526,15 +569,18 @@ const BookingForm: React.FC<BookingFormProps> = ({
           </select>
         </div>
         <div>
-          <label className="label">Daily Price *</label>
+          <label className="label">
+            Daily Price {priceMode === 'daily' ? '*' : '(calculated)'}
+          </label>
           <input
             type="number"
             name="daily_price"
             value={formData.daily_price}
             onChange={handleChange}
-            className="input"
+            className={`input ${priceMode === 'total' ? 'bg-gray-100' : ''}`}
             step="0.01"
-            required
+            required={priceMode === 'daily'}
+            disabled={priceMode === 'total'}
           />
         </div>
         <div>
@@ -564,13 +610,20 @@ const BookingForm: React.FC<BookingFormProps> = ({
       {/* Row 7: Total Amount */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="label">Guest Total Amount</label>
+          <label className="label">
+            Guest Total Amount {priceMode === 'total' ? '*' : '(calculated)'}
+          </label>
           <input
             type="number"
-            value={formData.guest_total_amount || ''}
-            disabled
-            className="input bg-gray-100 font-bold text-lg"
+            name="guest_total_amount"
+            value={formData.guest_total_amount ?? ''}
+            onChange={handleChange}
+            disabled={priceMode === 'daily'}
+            className={`input font-bold text-lg ${
+              priceMode === 'daily' ? 'bg-gray-100' : ''
+            }`}
             step="0.01"
+            required={priceMode === 'total'}
           />
         </div>
         <div>

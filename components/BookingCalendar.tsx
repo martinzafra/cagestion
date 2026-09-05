@@ -1,32 +1,30 @@
 'use client';
 
 import React, { useState } from 'react';
-import { formatDate } from '@/lib/calculations';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { getApartmentColorMap } from '@/lib/apartmentColors';
 
 interface BookingCalendarProps {
   bookings: any[];
-  apartmentFilter?: string | null;
+  apartments: { id: string; name: string }[];
+  selectedApartmentIds: string[];
+}
+
+function toDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 const BookingCalendar: React.FC<BookingCalendarProps> = ({
   bookings,
-  apartmentFilter,
+  apartments,
+  selectedApartmentIds,
 }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  const apartments = [
-    ...new Set(bookings.map((b) => b.apartment?.name).filter(Boolean)),
-  ];
-
-  const filteredApartments = apartmentFilter
-    ? apartments.filter(
-        (apt) =>
-          bookings.find(
-            (b) => b.apartment?.name === apt && b.apartment_id === apartmentFilter
-          )
-      )
-    : apartments;
+  const colorMap = getApartmentColorMap(apartments);
 
   const getDaysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -36,18 +34,16 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({
     return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
   };
 
-  const isBookingOnDate = (apartmentName: string, date: Date) => {
-    return bookings.find((b) => {
-      if (apartmentFilter && b.apartment_id !== apartmentFilter) return false;
-      if (b.apartment?.name !== apartmentName) return false;
-
-      const checkIn = new Date(b.check_in_date);
-      const checkOut = new Date(b.check_out_date);
-      return date >= checkIn && date < checkOut && b.status !== 'CANCELLED';
+  const getBookingsForDate = (date: Date) => {
+    const dateKey = toDateKey(date);
+    return bookings.filter((b) => {
+      if (!selectedApartmentIds.includes(b.apartment_id)) return false;
+      if (b.status === 'CANCELLED') return false;
+      return dateKey >= b.check_in_date && dateKey < b.check_out_date;
     });
   };
 
-  const days = [];
+  const days: (Date | null)[] = [];
   const daysInMonth = getDaysInMonth(currentMonth);
   const firstDay = getFirstDayOfMonth(currentMonth);
 
@@ -63,10 +59,14 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({
     year: 'numeric',
   });
 
+  const legendApartments = apartments.filter((a) =>
+    selectedApartmentIds.includes(a.id)
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Month Navigation */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center">
         <h3 className="text-xl font-bold">{monthName}</h3>
         <div className="flex gap-2">
           <button
@@ -98,63 +98,76 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({
         </div>
       </div>
 
-      {/* Calendar Grid for each Apartment */}
-      {filteredApartments.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          No apartments with bookings
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {filteredApartments.map((apartmentName) => (
-            <div key={apartmentName} className="border rounded-lg overflow-hidden">
-              <div className="bg-gray-100 px-4 py-2 font-semibold">
-                {apartmentName}
-              </div>
-
-              {/* Day headers */}
-              <div className="grid grid-cols-7 gap-px bg-gray-200">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                  <div
-                    key={day}
-                    className="bg-white p-2 text-center font-semibold text-sm"
-                  >
-                    {day}
-                  </div>
-                ))}
-              </div>
-
-              {/* Days */}
-              <div className="grid grid-cols-7 gap-px bg-gray-200 p-px">
-                {days.map((date, idx) => {
-                  const booking = date
-                    ? isBookingOnDate(apartmentName, date)
-                    : null;
-
-                  return (
-                    <div
-                      key={idx}
-                      className={`min-h-20 p-1 text-sm ${
-                        date ? 'bg-white' : 'bg-gray-50'
-                      }`}
-                    >
-                      {date && (
-                        <>
-                          <div className="font-semibold text-gray-700">
-                            {date.getDate()}
-                          </div>
-                          {booking && (
-                            <div className="mt-1 text-xs bg-blue-100 text-blue-800 rounded px-1 py-0.5 truncate">
-                              {booking.guest_name}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+      {/* Legend */}
+      {legendApartments.length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          {legendApartments.map((apt) => (
+            <div key={apt.id} className="flex items-center gap-1.5 text-sm">
+              <span
+                className={`w-3 h-3 rounded-full inline-block ${
+                  colorMap.get(apt.id)?.dot || 'bg-gray-400'
+                }`}
+              ></span>
+              <span className="text-gray-700">{apt.name}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Calendar Grid */}
+      <div className="border rounded-lg overflow-hidden">
+        <div className="grid grid-cols-7 gap-px bg-gray-200">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+            <div
+              key={day}
+              className="bg-white p-2 text-center font-semibold text-sm"
+            >
+              {day}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 gap-px bg-gray-200 p-px">
+          {days.map((date, idx) => {
+            const dayBookings = date ? getBookingsForDate(date) : [];
+
+            return (
+              <div
+                key={idx}
+                className={`min-h-24 p-1 text-sm ${date ? 'bg-white' : 'bg-gray-50'}`}
+              >
+                {date && (
+                  <>
+                    <div className="font-semibold text-gray-700 text-xs mb-1">
+                      {date.getDate()}
+                    </div>
+                    <div className="space-y-0.5">
+                      {dayBookings.map((b) => {
+                        const color = colorMap.get(b.apartment_id);
+                        return (
+                          <div
+                            key={b.id}
+                            title={`${b.apartment?.name || ''} - ${b.guest_name}`}
+                            className={`text-[10px] leading-tight rounded px-1 py-0.5 truncate ${
+                              color?.chip || 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {b.guest_name}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {legendApartments.length === 0 && (
+        <div className="text-center py-8 text-gray-500">
+          Select at least one apartment to see bookings
         </div>
       )}
     </div>
