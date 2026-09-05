@@ -57,6 +57,11 @@ module.exports = {
         },
       },
       fontFamily: {
+        // Overrides Tailwind's default `font-sans` (ui-sans-serif...) so the
+        // `font-sans` class on <body> actually resolves to the brand's Inter,
+        // instead of silently winning over globals.css's `body{}` rule via
+        // higher class specificity.
+        sans: ['var(--font-inter)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
       },
       boxShadow: {
