@@ -97,11 +97,11 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=    # From Supabase Settings > API (anon key, not 
 
 ## Testing Credentials
 
-Live in the `sajrwsfpvkitqubvzotc` Supabase project. Login accepts either email or username.
+Live in the `sajrwsfpvkitqubvzotc` Supabase project. Login accepts either email or username. All 3 users share the same password.
 
-- Admin: admin@example.com / username `admin` / admin123
-- Agent Barbara (BM): barbara@example.com / username `barbara` / barbara123
-- Agent Karo (KW): karo@example.com / username `karo` / karo123
+- Admin: admin@example.com / username `admin` / laherradura
+- Agent Barbara (BM): barbara@example.com / username `barbara` / laherradura
+- Agent Karo (KW): karo@example.com / username `karo` / laherradura
 
 ## Performance Notes
 
