@@ -5,6 +5,7 @@ import { formatDate, formatCurrency } from '@/lib/calculations';
 import { Edit2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
+import StatusBadge from '@/components/StatusBadge';
 
 interface BookingsListProps {
   bookings: any[];
@@ -71,17 +72,7 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh }) => {
                   {formatCurrency(booking.guest_total_amount || 0)}
                 </td>
                 <td>
-                  <span
-                    className={`px-2 py-1 rounded text-sm font-medium ${
-                      booking.status === 'CONFIRMED'
-                        ? 'bg-green-100 text-green-800'
-                        : booking.status === 'PENDING CONFIRMATION'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}
-                  >
-                    {booking.status}
-                  </span>
+                  <StatusBadge status={booking.status} />
                 </td>
                 <td onClick={(e) => e.stopPropagation()}>
                   <button className="p-1 hover:bg-blue-100 rounded" title="Edit">

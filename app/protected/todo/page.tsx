@@ -3,17 +3,20 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
+import StatusBadge from '@/components/StatusBadge';
+import StatusSquare from '@/components/StatusSquare';
 
 type TaskStatus = 'TO BE DONE' | 'DONE' | 'NA';
 type InvoiceStatus = 'TO BE DONE' | 'SENT' | 'NA';
-type TodoStatus = 'CONFIRMED' | 'CHECKED IN' | 'CHECKED OUT';
 
 interface BookingRow {
   id: string;
   booking_ref: string;
   guest_name: string;
+  status: 'CONFIRMED' | 'PENDING CONFIRMATION' | 'CANCELLED';
+  check_in_date: string;
+  check_out_date: string;
   apartment: { name: string } | null;
-  todo_status: TodoStatus;
   police_registration: TaskStatus;
   police_registration_date: string | null;
   platform_invoice: InvoiceStatus;
@@ -23,6 +26,16 @@ interface BookingRow {
 }
 
 const todayISO = () => new Date().toISOString().split('T')[0];
+
+// Computed automatically: past checkout -> Checked Out, past check-in ->
+// Checked In, otherwise the booking hasn't started yet so show its
+// reservation status (Confirmed / Pending Confirmation / Cancelled).
+function computeTodoStatus(b: BookingRow): string {
+  const today = todayISO();
+  if (today >= b.check_out_date) return 'CHECKED OUT';
+  if (today >= b.check_in_date) return 'CHECKED IN';
+  return b.status;
+}
 
 export default function TodoPage() {
   const [bookings, setBookings] = useState<BookingRow[]>([]);
@@ -39,9 +52,9 @@ export default function TodoPage() {
       const { data, error } = await supabase
         .from('bookings')
         .select(`
-          id, booking_ref, guest_name,
+          id, booking_ref, guest_name, status, check_in_date, check_out_date,
           apartment:inventory_apartments(name),
-          todo_status, police_registration, police_registration_date,
+          police_registration, police_registration_date,
           platform_invoice, platform_invoice_date,
           final_liquidation, final_liquidation_date
         `)
@@ -76,10 +89,6 @@ export default function TodoPage() {
     }
   };
 
-  const handleTodoStatusChange = (id: string, value: TodoStatus) => {
-    updateBooking(id, { todo_status: value });
-  };
-
   const handleTaskStatusChange = (
     booking: BookingRow,
     field: 'police_registration' | 'platform_invoice' | 'final_liquidation',
@@ -90,6 +99,9 @@ export default function TodoPage() {
     const isCompleteValue = value === 'DONE' || value === 'SENT';
     if (isCompleteValue && !booking[dateField]) {
       updates[dateField] = todayISO();
+    }
+    if (value === 'NA') {
+      updates[dateField] = null;
     }
     updateBooking(booking.id, updates);
   };
@@ -155,36 +167,22 @@ export default function TodoPage() {
                       {b.guest_name} <span className="text-gray-400">({b.booking_ref})</span>
                     </td>
                     <td>
-                      <select
-                        value={b.todo_status}
-                        onChange={(e) =>
-                          handleTodoStatusChange(b.id, e.target.value as TodoStatus)
-                        }
-                        className="select"
-                      >
-                        <option value="CONFIRMED">Confirmed</option>
-                        <option value="CHECKED IN">Checked In</option>
-                        <option value="CHECKED OUT">Checked Out</option>
-                      </select>
+                      <StatusBadge status={computeTodoStatus(b)} />
                     </td>
                     <td>
                       <div className="flex gap-2 items-center">
-                        <select
+                        <StatusSquare
                           value={b.police_registration}
-                          onChange={(e) =>
+                          doneValue="DONE"
+                          onChange={(value) =>
                             handleTaskStatusChange(
                               b,
                               'police_registration',
                               'police_registration_date',
-                              e.target.value
+                              value
                             )
                           }
-                          className="select"
-                        >
-                          <option value="TO BE DONE">To Be Done</option>
-                          <option value="DONE">Done</option>
-                          <option value="NA">N/A</option>
-                        </select>
+                        />
                         <input
                           type="date"
                           value={b.police_registration_date || ''}
@@ -202,22 +200,18 @@ export default function TodoPage() {
                     </td>
                     <td>
                       <div className="flex gap-2 items-center">
-                        <select
+                        <StatusSquare
                           value={b.platform_invoice}
-                          onChange={(e) =>
+                          doneValue="SENT"
+                          onChange={(value) =>
                             handleTaskStatusChange(
                               b,
                               'platform_invoice',
                               'platform_invoice_date',
-                              e.target.value
+                              value
                             )
                           }
-                          className="select"
-                        >
-                          <option value="TO BE DONE">To Be Done</option>
-                          <option value="SENT">Sent</option>
-                          <option value="NA">N/A</option>
-                        </select>
+                        />
                         <input
                           type="date"
                           value={b.platform_invoice_date || ''}
@@ -235,22 +229,18 @@ export default function TodoPage() {
                     </td>
                     <td>
                       <div className="flex gap-2 items-center">
-                        <select
+                        <StatusSquare
                           value={b.final_liquidation}
-                          onChange={(e) =>
+                          doneValue="SENT"
+                          onChange={(value) =>
                             handleTaskStatusChange(
                               b,
                               'final_liquidation',
                               'final_liquidation_date',
-                              e.target.value
+                              value
                             )
                           }
-                          className="select"
-                        >
-                          <option value="TO BE DONE">To Be Done</option>
-                          <option value="SENT">Sent</option>
-                          <option value="NA">N/A</option>
-                        </select>
+                        />
                         <input
                           type="date"
                           value={b.final_liquidation_date || ''}
