@@ -13,7 +13,7 @@ const STATUS_COLORS: Record<string, string> = {
 export default function StatusBadge({ status }: { status: string }) {
   const color = STATUS_COLORS[status] || 'bg-gray-100 text-gray-800';
   return (
-    <span className={`px-2 py-1 rounded text-sm font-medium whitespace-nowrap ${color}`}>
+    <span className={`px-2.5 py-1 rounded-full text-sm font-medium whitespace-nowrap ${color}`}>
       {status}
     </span>
   );

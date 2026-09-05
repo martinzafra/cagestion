@@ -36,8 +36,8 @@ const Navigation: React.FC<NavigationProps> = ({ userRole = 'agent', userName })
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo / Brand */}
-          <Link href="/" className="flex-shrink-0 font-bold text-xl">
-            Casa Amiga
+          <Link href="/" className="flex-shrink-0 font-display font-bold text-2xl tracking-wide lowercase">
+            casa amiga
           </Link>
 
           {/* Desktop Navigation */}

@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --ca-azure: #0A6A9A;
+  --ca-azure-hover: #085A85;
+  --ca-sky: #98BBD1;
+  --ca-mid: #7EA9CB;
+  --ca-white: #FFFFFF;
+  --ca-linen: #F8F5F0;
+  --ca-sand: #EDE6DA;
+  --ca-ink: #1C1C1C;
+  --ca-gray: #6E6E6E;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -13,11 +25,17 @@ html {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
+    'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+  h1, h2 {
+    font-family: var(--font-cormorant), 'Cormorant Garamond', Georgia, serif;
+  }
 }
 
 input::-webkit-outer-spin-button,
@@ -32,15 +50,15 @@ input[type='number'] {
 
 @layer components {
   .btn {
-    @apply px-4 py-2 rounded-md font-medium transition;
+    @apply px-6 py-2.5 rounded-full font-medium transition inline-flex items-center gap-2 hover:-translate-y-0.5;
   }
 
   .btn-primary {
-    @apply btn bg-blue-600 text-white hover:bg-blue-700;
+    @apply btn bg-azure text-white hover:bg-azure-hover hover:shadow-btn-hover;
   }
 
   .btn-secondary {
-    @apply btn bg-gray-200 text-gray-800 hover:bg-gray-300;
+    @apply btn bg-sand text-ink hover:bg-[#e3d9c8];
   }
 
   .btn-danger {
@@ -48,15 +66,15 @@ input[type='number'] {
   }
 
   .btn-sm {
-    @apply px-2 py-1 text-sm;
+    @apply px-3 py-1.5 text-sm;
   }
 
   .input {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500;
+    @apply w-full px-3.5 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-azure focus:border-azure transition;
   }
 
   .select {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white;
+    @apply w-full px-3.5 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-azure focus:border-azure bg-white transition;
   }
 
   .label {
@@ -64,7 +82,7 @@ input[type='number'] {
   }
 
   .card {
-    @apply bg-white rounded-lg shadow-md p-6;
+    @apply bg-white rounded-3xl shadow-card p-6;
   }
 
   .table {
