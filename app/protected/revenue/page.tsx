@@ -310,6 +310,7 @@ export default function RevenuePage() {
             <thead>
               <tr>
                 <th>Type</th>
+                <th>Invoice #</th>
                 <th>Date</th>
                 <th>Guest</th>
                 <th>Apartment</th>
@@ -324,7 +325,7 @@ export default function RevenuePage() {
             <tbody>
               {revenues.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-center py-8 text-gray-500">
+                  <td colSpan={11} className="text-center py-8 text-gray-500">
                     No revenue entries
                   </td>
                 </tr>
@@ -332,6 +333,7 @@ export default function RevenuePage() {
                 revenues.map((rev) => (
                   <tr key={rev.id}>
                     <td className="text-sm">{rev.revenue_type}</td>
+                    <td className="font-mono text-sm">{rev.revenue_number}</td>
                     <td>{formatDate(rev.revenue_date)}</td>
                     <td className="font-medium">{rev.booking?.guest_name}</td>
                     <td>{rev.apartment?.name}</td>
