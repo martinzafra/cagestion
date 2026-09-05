@@ -48,6 +48,13 @@ module.exports = {
           500: '#8B5E3C',
           800: '#5C3A21',
         },
+        // Vivid true blue for apartment color-coding — distinct from the
+        // muted azure brand accent that now occupies Tailwind's "blue" scale.
+        royal: {
+          100: '#DBEAFE',
+          500: '#2563EB',
+          800: '#1E3A8A',
+        },
       },
       fontFamily: {
         display: ['"Cormorant Garamond"', 'Georgia', 'serif'],

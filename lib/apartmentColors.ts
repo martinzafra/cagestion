@@ -8,8 +8,8 @@ export interface ApartmentColor {
 // filter chip legend) regardless of fetch order.
 const NAME_COLORS: Record<string, ApartmentColor> = {
   Alexandrite: { dot: 'bg-red-500', chip: 'bg-red-100 text-red-800' },
-  Barbarita: { dot: 'bg-blue-500', chip: 'bg-blue-100 text-blue-800' },
-  'Cas Artur': { dot: 'bg-brown-500', chip: 'bg-brown-100 text-brown-800' },
+  Barbarita: { dot: 'bg-royal-500', chip: 'bg-royal-100 text-royal-800' },
+  'Casa Artur': { dot: 'bg-brown-500', chip: 'bg-brown-100 text-brown-800' },
   Catamaran: { dot: 'bg-violet-500', chip: 'bg-violet-100 text-violet-800' },
   TMB: { dot: 'bg-green-500', chip: 'bg-green-100 text-green-800' },
 };
