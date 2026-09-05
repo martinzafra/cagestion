@@ -51,7 +51,7 @@ export default function ReportsPage() {
 
       if (userData?.role !== 'admin') {
         toast.error('Access denied. Reports are admin only.');
-        window.location.href = '/bookings';
+        window.location.href = '/protected/bookings';
         return;
       }
 

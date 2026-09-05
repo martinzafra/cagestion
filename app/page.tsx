@@ -7,7 +7,7 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    router.push('/bookings');
+    router.push('/protected/bookings');
   }, [router]);
 
   return null;

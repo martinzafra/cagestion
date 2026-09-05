@@ -43,7 +43,7 @@ export default function LoginPage() {
         toast.error(error.message);
       } else {
         toast.success('Login successful!');
-        router.push('/bookings');
+        router.push('/protected/bookings');
       }
     } catch (err) {
       toast.error('An error occurred during login');

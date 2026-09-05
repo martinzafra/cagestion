@@ -62,7 +62,7 @@ export default function InventoryPage() {
 
       if (userData?.role !== 'admin') {
         toast.error('Access denied');
-        window.location.href = '/bookings';
+        window.location.href = '/protected/bookings';
         return;
       }
 

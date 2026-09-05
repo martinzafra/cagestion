@@ -21,12 +21,12 @@ const Navigation: React.FC<NavigationProps> = ({ userRole = 'agent', userName })
   };
 
   const navItems = [
-    { href: '/bookings', label: 'Bookings', public: true },
-    { href: '/revenue', label: 'Revenue & Invoicing', public: true },
-    { href: '/expenses', label: 'Expenses', public: true },
-    { href: '/reports', label: 'Reports', public: true },
+    { href: '/protected/bookings', label: 'Bookings', public: true },
+    { href: '/protected/revenue', label: 'Revenue & Invoicing', public: true },
+    { href: '/protected/expenses', label: 'Expenses', public: true },
+    { href: '/protected/reports', label: 'Reports', public: true },
     ...(userRole === 'admin'
-      ? [{ href: '/inventory', label: 'Inventory', public: false }]
+      ? [{ href: '/protected/inventory', label: 'Inventory', public: false }]
       : []),
   ];
 
