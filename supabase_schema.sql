@@ -113,10 +113,6 @@ CREATE TABLE IF NOT EXISTS revenue_invoicing (
   apartment_id UUID NOT NULL REFERENCES inventory_apartments(id),
   booking_id UUID NOT NULL REFERENCES bookings(id),
 
-  guest_name TEXT GENERATED ALWAYS AS (
-    SELECT guest_name FROM bookings WHERE bookings.id = booking_id
-  ) STORED,
-
   invoice_item_id UUID NOT NULL REFERENCES inventory_invoice_items(id),
   total_services DECIMAL(10, 2) NOT NULL,
   commission_percentage DECIMAL(5, 2) NOT NULL,

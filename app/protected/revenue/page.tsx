@@ -334,7 +334,7 @@ export default function RevenuePage() {
                   <tr key={rev.id}>
                     <td className="text-sm">{rev.revenue_type}</td>
                     <td>{formatDate(rev.revenue_date)}</td>
-                    <td className="font-medium">{rev.guest_name}</td>
+                    <td className="font-medium">{rev.booking?.guest_name}</td>
                     <td>{rev.apartment?.name}</td>
                     <td>{rev.item?.name}</td>
                     <td>{formatCurrency(rev.total_services)}</td>
