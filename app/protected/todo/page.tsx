@@ -16,6 +16,7 @@ interface BookingRow {
   status: 'CONFIRMED' | 'PENDING CONFIRMATION' | 'CANCELLED';
   check_in_date: string;
   check_out_date: string;
+  apartment_id: string;
   apartment: { name: string } | null;
   police_registration: TaskStatus;
   police_registration_date: string | null;
@@ -37,13 +38,31 @@ function computeTodoStatus(b: BookingRow): string {
   return b.status;
 }
 
+const ROW_TINT: Record<string, string> = {
+  CONFIRMED: 'bg-green-50',
+  'PENDING CONFIRMATION': 'bg-yellow-50',
+  'CHECKED IN': 'bg-blue-50',
+  'CHECKED OUT': 'bg-gray-50',
+};
+
 export default function TodoPage() {
   const [bookings, setBookings] = useState<BookingRow[]>([]);
+  const [apartments, setApartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCompleted, setShowCompleted] = useState(false);
 
+  const [filters, setFilters] = useState({
+    apartment_id: '',
+    search: '',
+    todo_status: '',
+    police_registration: '',
+    platform_invoice: '',
+    final_liquidation: '',
+  });
+
   useEffect(() => {
     fetchBookings();
+    fetchApartments();
   }, []);
 
   const fetchBookings = async () => {
@@ -53,7 +72,7 @@ export default function TodoPage() {
         .from('bookings')
         .select(`
           id, booking_ref, guest_name, status, check_in_date, check_out_date,
-          apartment:inventory_apartments(name),
+          apartment_id, apartment:inventory_apartments(name),
           police_registration, police_registration_date,
           platform_invoice, platform_invoice_date,
           final_liquidation, final_liquidation_date
@@ -70,12 +89,47 @@ export default function TodoPage() {
     }
   };
 
+  const fetchApartments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('inventory_apartments')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setApartments(data || []);
+    } catch (error) {
+      toast.error('Failed to fetch apartments');
+    }
+  };
+
   const isPending = (b: BookingRow) =>
     b.police_registration === 'TO BE DONE' ||
     b.platform_invoice === 'TO BE DONE' ||
     b.final_liquidation === 'TO BE DONE';
 
-  const visibleBookings = showCompleted ? bookings : bookings.filter(isPending);
+  const filteredBookings = bookings.filter((b) => {
+    if (filters.apartment_id && b.apartment_id !== filters.apartment_id) return false;
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      const matches =
+        b.guest_name?.toLowerCase().includes(q) ||
+        b.booking_ref?.toLowerCase().includes(q);
+      if (!matches) return false;
+    }
+    if (filters.todo_status && computeTodoStatus(b) !== filters.todo_status) return false;
+    if (filters.police_registration && b.police_registration !== filters.police_registration)
+      return false;
+    if (filters.platform_invoice && b.platform_invoice !== filters.platform_invoice)
+      return false;
+    if (filters.final_liquidation && b.final_liquidation !== filters.final_liquidation)
+      return false;
+    return true;
+  });
+
+  const visibleBookings = showCompleted
+    ? filteredBookings
+    : filteredBookings.filter(isPending);
 
   const updateBooking = async (id: string, updates: Record<string, any>) => {
     try {
@@ -133,6 +187,76 @@ export default function TodoPage() {
         </label>
       </div>
 
+      {/* Filter line */}
+      <div className="card">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <select
+            value={filters.apartment_id}
+            onChange={(e) => setFilters({ ...filters, apartment_id: e.target.value })}
+            className="select"
+          >
+            <option value="">All Apartments</option>
+            {apartments.map((apt) => (
+              <option key={apt.id} value={apt.id}>
+                {apt.name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            placeholder="Search guest or reference..."
+            value={filters.search}
+            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+            className="input"
+          />
+          <select
+            value={filters.todo_status}
+            onChange={(e) => setFilters({ ...filters, todo_status: e.target.value })}
+            className="select"
+          >
+            <option value="">All To Do Status</option>
+            <option value="CONFIRMED">Confirmed</option>
+            <option value="PENDING CONFIRMATION">Pending Confirmation</option>
+            <option value="CHECKED IN">Checked In</option>
+            <option value="CHECKED OUT">Checked Out</option>
+          </select>
+          <select
+            value={filters.police_registration}
+            onChange={(e) =>
+              setFilters({ ...filters, police_registration: e.target.value })
+            }
+            className="select"
+          >
+            <option value="">Police Registration: All</option>
+            <option value="TO BE DONE">To Be Done</option>
+            <option value="DONE">Done</option>
+            <option value="NA">N/A</option>
+          </select>
+          <select
+            value={filters.platform_invoice}
+            onChange={(e) => setFilters({ ...filters, platform_invoice: e.target.value })}
+            className="select"
+          >
+            <option value="">Platform Invoice: All</option>
+            <option value="TO BE DONE">To Be Done</option>
+            <option value="SENT">Sent</option>
+            <option value="NA">N/A</option>
+          </select>
+          <select
+            value={filters.final_liquidation}
+            onChange={(e) =>
+              setFilters({ ...filters, final_liquidation: e.target.value })
+            }
+            className="select"
+          >
+            <option value="">Final Liquidation: All</option>
+            <option value="TO BE DONE">To Be Done</option>
+            <option value="SENT">Sent</option>
+            <option value="NA">N/A</option>
+          </select>
+        </div>
+      </div>
+
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -160,75 +284,76 @@ export default function TodoPage() {
                   </td>
                 </tr>
               ) : (
-                visibleBookings.map((b) => (
-                  <tr key={b.id}>
-                    <td className="whitespace-nowrap">{b.apartment?.name}</td>
-                    <td className="whitespace-nowrap">
-                      {b.guest_name} <span className="text-gray-400">({b.booking_ref})</span>
-                    </td>
-                    <td>
-                      <StatusBadge status={computeTodoStatus(b)} />
-                    </td>
-                    <td>
-                      <div className="flex gap-2 items-center">
-                        <StatusSquare
-                          value={b.police_registration}
-                          doneValue="DONE"
-                          onChange={(value) =>
-                            handleTaskStatusChange(
-                              b,
-                              'police_registration',
-                              'police_registration_date',
-                              value
-                            )
-                          }
-                        />
-                        <input
-                          type="date"
-                          value={b.police_registration_date || ''}
-                          onChange={(e) =>
-                            handleDateChange(
-                              b.id,
-                              'police_registration_date',
-                              e.target.value
-                            )
-                          }
-                          disabled={b.police_registration !== 'DONE'}
-                          className="input"
-                        />
-                      </div>
-                    </td>
-                    <td>
-                      <div className="flex gap-2 items-center">
-                        <StatusSquare
-                          value={b.platform_invoice}
-                          doneValue="SENT"
-                          onChange={(value) =>
-                            handleTaskStatusChange(
-                              b,
-                              'platform_invoice',
-                              'platform_invoice_date',
-                              value
-                            )
-                          }
-                        />
-                        <input
-                          type="date"
-                          value={b.platform_invoice_date || ''}
-                          onChange={(e) =>
-                            handleDateChange(
-                              b.id,
-                              'platform_invoice_date',
-                              e.target.value
-                            )
-                          }
-                          disabled={b.platform_invoice !== 'SENT'}
-                          className="input"
-                        />
-                      </div>
-                    </td>
-                    <td>
-                      <div className="flex gap-2 items-center">
+                visibleBookings.map((b) => {
+                  const todoStatus = computeTodoStatus(b);
+                  return (
+                    <tr key={b.id} className={ROW_TINT[todoStatus] || ''}>
+                      <td className="whitespace-nowrap">{b.apartment?.name}</td>
+                      <td className="whitespace-nowrap">
+                        {b.guest_name} <span className="text-gray-400">({b.booking_ref})</span>
+                      </td>
+                      <td>
+                        <StatusBadge status={todoStatus} />
+                      </td>
+                      <td>
+                        <div className="flex gap-2 items-center">
+                          <StatusSquare
+                            value={b.police_registration}
+                            doneValue="DONE"
+                            onChange={(value) =>
+                              handleTaskStatusChange(
+                                b,
+                                'police_registration',
+                                'police_registration_date',
+                                value
+                              )
+                            }
+                          />
+                          <input
+                            type="date"
+                            value={b.police_registration_date || ''}
+                            onChange={(e) =>
+                              handleDateChange(
+                                b.id,
+                                'police_registration_date',
+                                e.target.value
+                              )
+                            }
+                            disabled={b.police_registration !== 'DONE'}
+                            className="input"
+                          />
+                        </div>
+                      </td>
+                      <td>
+                        <div className="flex gap-2 items-center">
+                          <StatusSquare
+                            value={b.platform_invoice}
+                            doneValue="SENT"
+                            onChange={(value) =>
+                              handleTaskStatusChange(
+                                b,
+                                'platform_invoice',
+                                'platform_invoice_date',
+                                value
+                              )
+                            }
+                          />
+                          <input
+                            type="date"
+                            value={b.platform_invoice_date || ''}
+                            onChange={(e) =>
+                              handleDateChange(
+                                b.id,
+                                'platform_invoice_date',
+                                e.target.value
+                              )
+                            }
+                            disabled={b.platform_invoice !== 'SENT'}
+                            className="input"
+                          />
+                        </div>
+                      </td>
+                      <td>
                         <StatusSquare
                           value={b.final_liquidation}
                           doneValue="SENT"
@@ -241,23 +366,10 @@ export default function TodoPage() {
                             )
                           }
                         />
-                        <input
-                          type="date"
-                          value={b.final_liquidation_date || ''}
-                          onChange={(e) =>
-                            handleDateChange(
-                              b.id,
-                              'final_liquidation_date',
-                              e.target.value
-                            )
-                          }
-                          disabled={b.final_liquidation !== 'SENT'}
-                          className="input"
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

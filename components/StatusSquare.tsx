@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { CheckSquare, Square, MinusSquare } from 'lucide-react';
+import { Check, Minus } from 'lucide-react';
 
 interface StatusSquareProps {
   value: string; // 'TO BE DONE' | 'DONE' | 'SENT' | 'NA'
@@ -17,23 +17,29 @@ export default function StatusSquare({ value, doneValue, onChange }: StatusSquar
     onChange(next);
   };
 
-  const label =
-    value === doneValue ? (doneValue === 'DONE' ? 'Done' : 'Sent') : value === 'NA' ? 'N/A' : 'To Be Done';
+  const isDone = value === doneValue;
+  const isNA = value === 'NA';
+  const label = isDone ? (doneValue === 'DONE' ? 'Done' : 'Sent') : isNA ? 'N/A' : 'To Be Done';
 
   return (
     <button
       type="button"
       onClick={cycle}
       title={`${label} — click to change`}
-      className="inline-flex items-center justify-center hover:opacity-70 transition"
+      className="inline-flex items-center justify-center"
     >
-      {value === doneValue ? (
-        <CheckSquare size={26} className="text-green-600" fill="#dcfce7" />
-      ) : value === 'NA' ? (
-        <MinusSquare size={26} className="text-gray-500" fill="#e5e7eb" />
-      ) : (
-        <Square size={26} className="text-gray-400" />
-      )}
+      <span
+        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition ${
+          isDone
+            ? 'bg-green-500 border-green-500'
+            : isNA
+            ? 'bg-gray-300 border-gray-300'
+            : 'bg-white border-gray-300 hover:border-gray-400'
+        }`}
+      >
+        {isDone && <Check size={16} className="text-white" strokeWidth={3} />}
+        {isNA && <Minus size={16} className="text-gray-600" strokeWidth={3} />}
+      </span>
     </button>
   );
 }
