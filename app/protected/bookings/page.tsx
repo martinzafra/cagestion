@@ -98,6 +98,7 @@ export default function BookingsPage() {
   const handleEditBooking = (id: string) => {
     setEditingBookingId(id);
     setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleFormSuccess = () => {
