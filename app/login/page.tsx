@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -16,6 +16,24 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      let email = identifier.trim();
+
+      // If it's not an email, treat it as a username and resolve to email first
+      if (!email.includes('@')) {
+        const { data: resolvedEmail, error: lookupError } = await supabase.rpc(
+          'get_email_by_username',
+          { p_username: email }
+        );
+
+        if (lookupError || !resolvedEmail) {
+          toast.error('Usuario no encontrado');
+          setLoading(false);
+          return;
+        }
+
+        email = resolvedEmail;
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -48,16 +66,16 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label htmlFor="email" className="label">
-                Email
+              <label htmlFor="identifier" className="label">
+                Email or Username
               </label>
               <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="identifier"
+                type="text"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 className="input"
-                placeholder="your@email.com"
+                placeholder="your@email.com or username"
                 required
               />
             </div>
@@ -85,12 +103,6 @@ export default function LoginPage() {
               {loading ? 'Logging in...' : 'Login'}
             </button>
           </form>
-
-          <p className="text-center text-gray-600 text-sm mt-6">
-            Demo credentials: <br />
-            BM@example.com / password123 <br />
-            admin@example.com / admin123
-          </p>
         </div>
       </div>
     </>
