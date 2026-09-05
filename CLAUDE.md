@@ -97,10 +97,11 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=    # From Supabase Settings > API (anon key, not 
 
 ## Testing Credentials
 
-After running SQL seed script:
-- Admin: admin@example.com / admin123
-- Agent BM: bm@example.com / password123
-- Agent KW: kw@example.com / password123
+Live in the `sajrwsfpvkitqubvzotc` Supabase project. Login accepts either email or username.
+
+- Admin: admin@example.com / username `admin` / admin123
+- Agent Barbara (BM): barbara@example.com / username `barbara` / barbara123
+- Agent Karo (KW): karo@example.com / username `karo` / karo123
 
 ## Performance Notes
 
