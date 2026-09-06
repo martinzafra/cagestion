@@ -62,7 +62,9 @@ export default function ExpensesPage() {
       if (aptRes.data) {
         setApartments(aptRes.data);
         setApartmentFilterIds((prev) =>
-          prev.size === 0 ? new Set(aptRes.data.map((a: any) => a.id)) : prev
+          prev.size === 0
+            ? new Set(aptRes.data.filter((a: any) => a.active !== false).map((a: any) => a.id))
+            : prev
         );
       }
       if (typesRes.data) setExpenseTypes(typesRes.data);
@@ -168,12 +170,17 @@ export default function ExpensesPage() {
   };
 
   const apartmentColorMap = getApartmentColorMap(apartments);
+  const activeApartments = apartments.filter((a) => a.active !== false);
 
   const filteredExpenses = expenses.filter((exp) => {
-    // General expenses (no apartment) always show; apartment-tied ones
-    // are narrowed by the selected apartments.
+    // General expenses (no apartment) always show. Inactive apartments have
+    // no filter chip to toggle, so their data always passes through too.
     if (!exp.apartment_id) return true;
-    return apartments.length === 0 || apartmentFilterIds.has(exp.apartment_id);
+    const apt = apartments.find((a) => a.id === exp.apartment_id);
+    const isActive = apt ? apt.active !== false : true;
+    if (isActive && apartments.length > 0 && !apartmentFilterIds.has(exp.apartment_id))
+      return false;
+    return true;
   });
 
   return (
@@ -390,7 +397,7 @@ export default function ExpensesPage() {
           <div className="card">
             <label className="text-xs text-gray-500 block mb-1.5">Apartment</label>
             <div className="flex flex-wrap gap-2">
-              {apartments.map((apt) => {
+              {activeApartments.map((apt) => {
                 const checked = apartmentFilterIds.has(apt.id);
                 return (
                   <label

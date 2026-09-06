@@ -32,7 +32,11 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({
   const getBookingsForDate = (date: Date) => {
     const dateKey = toDateKey(date);
     return bookings.filter((b) => {
-      if (!selectedApartmentIds.includes(b.apartment_id)) return false;
+      // Inactive apartments have no filter chip to toggle, so their
+      // bookings always show rather than silently disappearing.
+      const apt = apartments.find((a: any) => a.id === b.apartment_id);
+      const isActive = apt ? (apt as any).active !== false : true;
+      if (isActive && !selectedApartmentIds.includes(b.apartment_id)) return false;
       if (b.status === 'CANCELLED') return false;
       return dateKey >= b.check_in_date && dateKey < b.check_out_date;
     });

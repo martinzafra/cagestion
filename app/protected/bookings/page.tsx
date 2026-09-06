@@ -70,7 +70,9 @@ export default function BookingsPage() {
       if (error) throw error;
       setApartments(data || []);
       setCalendarApartmentIds((prev) =>
-        prev.length === 0 ? (data || []).map((a) => a.id) : prev
+        prev.length === 0
+          ? (data || []).filter((a) => a.active !== false).map((a) => a.id)
+          : prev
       );
     } catch (error) {
       toast.error('Failed to fetch apartments');
@@ -133,6 +135,7 @@ export default function BookingsPage() {
   });
 
   const colorMap = getApartmentColorMap(apartments);
+  const activeApartments = apartments.filter((a) => a.active !== false);
 
   const toggleCalendarApartment = (id: string) => {
     setCalendarApartmentIds((prev) =>
@@ -206,7 +209,7 @@ export default function BookingsPage() {
                 className="select"
               >
                 <option value="">All Apartments</option>
-                {apartments.map((apt) => (
+                {activeApartments.map((apt) => (
                   <option key={apt.id} value={apt.id}>
                     {apt.name}
                   </option>
@@ -266,7 +269,7 @@ export default function BookingsPage() {
                 }
                 className="input"
               />
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <label className="col-span-full flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
                 <input
                   type="checkbox"
                   checked={showFinished}
@@ -287,7 +290,7 @@ export default function BookingsPage() {
           <div className="mb-4">
             <label className="label">Filter by Apartment</label>
             <div className="flex flex-wrap gap-2">
-              {apartments.map((apt) => {
+              {activeApartments.map((apt) => {
                 const checked = calendarApartmentIds.includes(apt.id);
                 return (
                   <label

@@ -322,7 +322,7 @@ export default function TodoPage() {
             className="select"
           >
             <option value="">All Apartments</option>
-            {apartments.map((apt) => (
+            {apartments.filter((apt) => apt.active !== false).map((apt) => (
               <option key={apt.id} value={apt.id}>
                 {apt.name}
               </option>
