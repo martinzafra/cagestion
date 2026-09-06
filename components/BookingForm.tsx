@@ -36,6 +36,7 @@ interface FormData {
   cleaning_charge: number;
   other_charge: number;
   guest_total_amount: number | null;
+  owners_booking: boolean;
   police_registration: 'TO BE DONE' | 'DONE' | 'NA';
   platform_invoice: 'TO BE DONE' | 'SENT' | 'NA';
   platform_invoice_date: string | null;
@@ -81,6 +82,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
     cleaning_charge: 0,
     other_charge: 0,
     guest_total_amount: null,
+    owners_booking: false,
     police_registration: 'TO BE DONE',
     platform_invoice: 'TO BE DONE',
     platform_invoice_date: null,
@@ -102,7 +104,10 @@ const BookingForm: React.FC<BookingFormProps> = ({
       const calculatedNights = calculateNights(checkIn, checkOut);
       setNights(calculatedNights);
 
-      if (priceMode === 'daily') {
+      if (formData.owners_booking) {
+        const total = formData.cleaning_charge + formData.other_charge;
+        setFormData((prev) => ({ ...prev, daily_price: 0, total_rent: 0, guest_total_amount: total }));
+      } else if (priceMode === 'daily') {
         const rent = formData.daily_price * calculatedNights;
         const total = rent + formData.cleaning_charge + formData.other_charge;
         setFormData((prev) => ({ ...prev, total_rent: rent, guest_total_amount: total }));
@@ -124,6 +129,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
     formData.total_rent,
     formData.cleaning_charge,
     formData.other_charge,
+    formData.owners_booking,
     priceMode,
   ]);
 
@@ -312,7 +318,11 @@ const BookingForm: React.FC<BookingFormProps> = ({
   ) => {
     const { name, value, type } = e.target;
     const val =
-      type === 'number' ? (value ? parseFloat(value) : 0) : value;
+      type === 'checkbox'
+        ? (e.target as HTMLInputElement).checked
+        : type === 'number'
+        ? (value ? parseFloat(value) : 0)
+        : value;
 
     setFormData((prev) => ({
       ...prev,
@@ -551,65 +561,82 @@ const BookingForm: React.FC<BookingFormProps> = ({
         </div>
       </div>
 
-      {/* Pricing Mode Toggle */}
-      <div>
-        <label className="label">Pricing Mode</label>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setPriceMode('daily')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition ${
-              priceMode === 'daily'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Daily Rate
-          </button>
-          <button
-            type="button"
-            onClick={() => setPriceMode('total')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition ${
-              priceMode === 'total'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Total Rent
-          </button>
-        </div>
+      {/* Owners booking flag */}
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="owners_booking"
+          name="owners_booking"
+          checked={formData.owners_booking}
+          onChange={handleChange}
+          className="h-4 w-4"
+        />
+        <label htmlFor="owners_booking" className="label mb-0">
+          Owners booking (Non chargeable)
+        </label>
       </div>
+
+      {/* Pricing Mode Toggle */}
+      {!formData.owners_booking && (
+        <div>
+          <label className="label">Pricing Mode</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPriceMode('daily')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                priceMode === 'daily'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Daily Rate
+            </button>
+            <button
+              type="button"
+              onClick={() => setPriceMode('total')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                priceMode === 'total'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Total Rent
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Row 6: Rent pricing */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="label">
-            Daily Price {priceMode === 'daily' ? '*' : '(calculated)'}
+            Daily Price {formData.owners_booking ? '(N/A)' : priceMode === 'daily' ? '*' : '(calculated)'}
           </label>
           <input
             type="number"
             name="daily_price"
             value={formData.daily_price}
             onChange={handleChange}
-            className={`input ${priceMode === 'total' ? 'bg-gray-100' : ''}`}
+            className={`input ${formData.owners_booking || priceMode === 'total' ? 'bg-gray-100' : ''}`}
             step="0.01"
-            required={priceMode === 'daily'}
-            disabled={priceMode === 'total'}
+            required={!formData.owners_booking && priceMode === 'daily'}
+            disabled={formData.owners_booking || priceMode === 'total'}
           />
         </div>
         <div>
           <label className="label">
-            Total Rent {priceMode === 'total' ? '*' : '(calculated)'}
+            Total Rent {formData.owners_booking ? '(N/A)' : priceMode === 'total' ? '*' : '(calculated)'}
           </label>
           <input
             type="number"
             name="total_rent"
             value={formData.total_rent ?? ''}
             onChange={handleChange}
-            className={`input ${priceMode === 'daily' ? 'bg-gray-100' : ''}`}
+            className={`input ${formData.owners_booking || priceMode === 'daily' ? 'bg-gray-100' : ''}`}
             step="0.01"
-            required={priceMode === 'total'}
-            disabled={priceMode === 'daily'}
+            required={!formData.owners_booking && priceMode === 'total'}
+            disabled={formData.owners_booking || priceMode === 'daily'}
           />
         </div>
         <div>
