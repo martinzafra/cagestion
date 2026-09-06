@@ -148,7 +148,9 @@ const BookingForm: React.FC<BookingFormProps> = ({
       if (platformsRes.data) setPlatforms(platformsRes.data);
       if (paymentRes.data) setPaymentTypes(paymentRes.data);
 
-      // Agents only see apartments they've been enabled for; admins see all.
+      // Agents only see apartments enabled for whichever agent(s) they're
+      // assigned to (one user can be assigned to more than one agent, e.g.
+      // a shared "Both" agent); admins see all.
       let allowedApartments = apartmentsRes.data || [];
       const {
         data: { session },
@@ -157,25 +159,28 @@ const BookingForm: React.FC<BookingFormProps> = ({
       if (session) {
         const { data: userRow } = await supabase
           .from('users')
-          .select('role, agent_name')
+          .select('role')
           .eq('id', session.user.id)
           .single();
 
-        if (userRow?.role === 'agent' && userRow.agent_name) {
-          const { data: agentRow } = await supabase
-            .from('inventory_agents')
-            .select('id')
-            .eq('name', userRow.agent_name)
-            .single();
+        if (userRow?.role === 'agent') {
+          const { data: agentIdRows } = await supabase
+            .from('inventory_agent_users')
+            .select('agent_id')
+            .eq('user_id', session.user.id);
 
-          if (agentRow) {
+          const agentIds = (agentIdRows || []).map((r) => r.agent_id);
+
+          if (agentIds.length > 0) {
             const { data: allowedRows } = await supabase
               .from('inventory_agent_apartments')
               .select('apartment_id')
-              .eq('agent_id', agentRow.id);
+              .in('agent_id', agentIds);
 
             const allowedIds = new Set((allowedRows || []).map((r) => r.apartment_id));
             allowedApartments = allowedApartments.filter((a: any) => allowedIds.has(a.id));
+          } else {
+            allowedApartments = [];
           }
         }
       }

@@ -300,6 +300,19 @@ CREATE POLICY "Agent apartments read" ON inventory_agent_apartments FOR SELECT U
 CREATE POLICY "Agent apartments admin insert" ON inventory_agent_apartments FOR INSERT WITH CHECK (get_my_role() = 'admin');
 CREATE POLICY "Agent apartments admin delete" ON inventory_agent_apartments FOR DELETE USING (get_my_role() = 'admin');
 
+-- Agent <-> User assignment: which login user(s) a given agent name
+-- represents. Many-to-many so one agent (e.g. "Both") can be assigned to
+-- multiple users at once.
+CREATE TABLE IF NOT EXISTS inventory_agent_users (
+  agent_id UUID NOT NULL REFERENCES inventory_agents(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY (agent_id, user_id)
+);
+ALTER TABLE inventory_agent_users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Agent users read" ON inventory_agent_users FOR SELECT USING (is_registered_user());
+CREATE POLICY "Agent users admin insert" ON inventory_agent_users FOR INSERT WITH CHECK (get_my_role() = 'admin');
+CREATE POLICY "Agent users admin delete" ON inventory_agent_users FOR DELETE USING (get_my_role() = 'admin');
+
 CREATE OR REPLACE FUNCTION can_access_apartment(p_apartment_id UUID)
 RETURNS boolean
 LANGUAGE sql
@@ -313,9 +326,8 @@ AS $$
       ELSE EXISTS (
         SELECT 1
         FROM inventory_agent_apartments iaa
-        JOIN inventory_agents ia ON ia.id = iaa.agent_id
-        JOIN users u ON u.agent_name = ia.name
-        WHERE u.id = auth.uid() AND iaa.apartment_id = p_apartment_id
+        JOIN inventory_agent_users iau ON iau.agent_id = iaa.agent_id
+        WHERE iau.user_id = auth.uid() AND iaa.apartment_id = p_apartment_id
       )
     END;
 $$;

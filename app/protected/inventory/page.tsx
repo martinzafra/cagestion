@@ -28,6 +28,8 @@ export default function InventoryPage() {
   const [allAgents, setAllAgents] = useState<TabItem[]>([]);
   const [agentApartments, setAgentApartments] = useState<Set<string>>(new Set());
   const [showInactive, setShowInactive] = useState(false);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [agentUsers, setAgentUsers] = useState<Set<string>>(new Set());
 
   const tables: { [key in InventoryType]: string } = {
     agents: 'inventory_agents',
@@ -96,8 +98,59 @@ export default function InventoryPage() {
       if (activeTab === 'apartments') {
         fetchAgentApartments();
       }
+      if (activeTab === 'agents') {
+        fetchAgentUsers();
+      }
     } catch (error) {
       toast.error('Failed to fetch items');
+    }
+  };
+
+  const fetchAgentUsers = async () => {
+    try {
+      const [usersRes, linksRes] = await Promise.all([
+        supabase.from('users').select('id, full_name, email, role').neq('role', 'admin').order('full_name'),
+        supabase.from('inventory_agent_users').select('agent_id, user_id'),
+      ]);
+
+      if (usersRes.data) setAllUsers(usersRes.data);
+      if (linksRes.data) {
+        setAgentUsers(
+          new Set(linksRes.data.map((l: any) => `${l.agent_id}:${l.user_id}`))
+        );
+      }
+    } catch (error) {
+      toast.error('Failed to fetch agent user assignments');
+    }
+  };
+
+  const toggleAgentUser = async (agentId: string, userId: string) => {
+    const key = `${agentId}:${userId}`;
+    const isEnabled = agentUsers.has(key);
+
+    try {
+      if (isEnabled) {
+        const { error } = await supabase
+          .from('inventory_agent_users')
+          .delete()
+          .eq('agent_id', agentId)
+          .eq('user_id', userId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('inventory_agent_users')
+          .insert([{ agent_id: agentId, user_id: userId }]);
+        if (error) throw error;
+      }
+
+      setAgentUsers((prev) => {
+        const next = new Set(prev);
+        if (isEnabled) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update assignment');
     }
   };
 
@@ -479,6 +532,27 @@ export default function InventoryPage() {
                       className="input text-sm"
                     />
                   </div>
+                </div>
+              )}
+              {activeTab === 'agents' && allUsers.length > 0 && (
+                <div className="mt-3 pt-3 border-t flex flex-wrap gap-3">
+                  <span className="text-xs text-gray-500 w-full">Assigned users:</span>
+                  {allUsers.map((user) => {
+                    const enabled = agentUsers.has(`${item.id}:${user.id}`);
+                    return (
+                      <label
+                        key={user.id}
+                        className="flex items-center gap-1.5 text-sm cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={enabled}
+                          onChange={() => toggleAgentUser(item.id, user.id)}
+                        />
+                        {user.full_name || user.email}
+                      </label>
+                    );
+                  })}
                 </div>
               )}
               {activeTab === 'apartments' && allAgents.length > 0 && (
