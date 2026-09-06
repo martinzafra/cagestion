@@ -50,6 +50,7 @@ export type Database = {
           other_charge: number;
           guest_total_amount: number | null;
           police_registration: 'TO BE DONE' | 'DONE' | 'NA';
+          police_registration_file: string | null;
           platform_invoice: 'TO BE DONE' | 'SENT' | 'NA';
           platform_invoice_date: string | null;
           final_liquidation: 'TO BE DONE' | 'SENT' | 'NA';

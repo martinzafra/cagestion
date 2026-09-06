@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import StatusBadge from '@/components/StatusBadge';
 import StatusSquare from '@/components/StatusSquare';
 import { formatDate } from '@/lib/calculations';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, Image as ImageIcon } from 'lucide-react';
 
 type TaskStatus = 'TO BE DONE' | 'DONE' | 'NA';
 type InvoiceStatus = 'TO BE DONE' | 'SENT' | 'NA';
@@ -31,7 +31,7 @@ interface BookingRow {
   apartment_id: string;
   apartment: { name: string } | null;
   police_registration: TaskStatus;
-  police_registration_date: string | null;
+  police_registration_file: string | null;
   platform_invoice: InvoiceStatus;
   platform_invoice_date: string | null;
   final_liquidation: InvoiceStatus;
@@ -40,10 +40,22 @@ interface BookingRow {
 
 const todayISO = () => new Date().toISOString().split('T')[0];
 
-// Computed automatically: past checkout -> Checked Out, past check-in ->
-// Checked In, otherwise the booking hasn't started yet so show its
-// reservation status (Confirmed / Pending Confirmation / Cancelled).
+// A booking's admin tasks are done once each is either completed or marked
+// not applicable - nothing left in a "to be done" state.
+function isTaskComplete(b: BookingRow): boolean {
+  return (
+    (b.police_registration === 'DONE' || b.police_registration === 'NA') &&
+    (b.platform_invoice === 'SENT' || b.platform_invoice === 'NA') &&
+    (b.final_liquidation === 'SENT' || b.final_liquidation === 'NA')
+  );
+}
+
+// Computed automatically: all admin tasks done -> Completed, past checkout ->
+// Checked Out, past check-in -> Checked In, otherwise the booking hasn't
+// started yet so show its reservation status (Confirmed / Pending
+// Confirmation / Cancelled).
 function computeTodoStatus(b: BookingRow): string {
+  if (isTaskComplete(b)) return 'COMPLETED';
   const today = todayISO();
   if (today >= b.check_out_date) return 'CHECKED OUT';
   if (today >= b.check_in_date) return 'CHECKED IN';
@@ -55,6 +67,7 @@ const ROW_TINT: Record<string, string> = {
   'PENDING CONFIRMATION': 'bg-yellow-50',
   'CHECKED IN': 'bg-blue-50',
   'CHECKED OUT': 'bg-gray-50',
+  COMPLETED: 'bg-purple-50',
 };
 
 export default function TodoPage() {
@@ -62,6 +75,11 @@ export default function TodoPage() {
   const [apartments, setApartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCompleted, setShowCompleted] = useState(false);
+  // Snapshot of which rows were pending at the last fetch, frozen so a row
+  // that becomes complete while you work on it doesn't vanish from view
+  // mid-edit - it only drops off after the next refresh.
+  const [pendingSnapshotIds, setPendingSnapshotIds] = useState<Set<string>>(new Set());
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const [filters, setFilters] = useState({
     apartment_id: '',
@@ -88,7 +106,7 @@ export default function TodoPage() {
         .select(`
           id, booking_ref, guest_name, status, check_in_date, check_out_date,
           apartment_id, apartment:inventory_apartments(name),
-          police_registration, police_registration_date,
+          police_registration, police_registration_file,
           platform_invoice, platform_invoice_date,
           final_liquidation, final_liquidation_date
         `)
@@ -96,7 +114,9 @@ export default function TodoPage() {
         .order('check_in_date', { ascending: true });
 
       if (error) throw error;
-      setBookings((data as any) || []);
+      const rows = (data as any) || [];
+      setBookings(rows);
+      setPendingSnapshotIds(new Set(rows.filter((b: BookingRow) => !isTaskComplete(b)).map((b: BookingRow) => b.id)));
     } catch (error) {
       toast.error('Failed to fetch bookings');
     } finally {
@@ -117,11 +137,6 @@ export default function TodoPage() {
       toast.error('Failed to fetch apartments');
     }
   };
-
-  const isPending = (b: BookingRow) =>
-    b.police_registration === 'TO BE DONE' ||
-    b.platform_invoice === 'TO BE DONE' ||
-    b.final_liquidation === 'TO BE DONE';
 
   const filteredBookings = bookings.filter((b) => {
     if (filters.apartment_id && b.apartment_id !== filters.apartment_id) return false;
@@ -144,7 +159,7 @@ export default function TodoPage() {
 
   const visibleBookings = showCompleted
     ? filteredBookings
-    : filteredBookings.filter(isPending);
+    : filteredBookings.filter((b) => pendingSnapshotIds.has(b.id));
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn !== column) {
@@ -201,7 +216,7 @@ export default function TodoPage() {
       <span className="inline-flex items-center gap-1">
         {children}
         {sortColumn === column &&
-          (sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+          (sortDirection === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
       </span>
     </th>
   );
@@ -221,16 +236,18 @@ export default function TodoPage() {
   const handleTaskStatusChange = (
     booking: BookingRow,
     field: 'police_registration' | 'platform_invoice' | 'final_liquidation',
-    dateField: 'police_registration_date' | 'platform_invoice_date' | 'final_liquidation_date',
+    dateField: 'platform_invoice_date' | 'final_liquidation_date' | null,
     value: string
   ) => {
     const updates: Record<string, any> = { [field]: value };
     const isCompleteValue = value === 'DONE' || value === 'SENT';
-    if (isCompleteValue && !booking[dateField]) {
-      updates[dateField] = todayISO();
-    }
-    if (value === 'NA') {
-      updates[dateField] = null;
+    if (dateField) {
+      if (isCompleteValue && !booking[dateField]) {
+        updates[dateField] = todayISO();
+      }
+      if (value === 'NA') {
+        updates[dateField] = null;
+      }
     }
     // Final liquidation sent closes the booking out; un-sending it re-opens
     // the booking rather than leaving it stuck as Finished.
@@ -243,10 +260,38 @@ export default function TodoPage() {
 
   const handleDateChange = (
     id: string,
-    dateField: 'police_registration_date' | 'platform_invoice_date' | 'final_liquidation_date',
+    dateField: 'platform_invoice_date' | 'final_liquidation_date',
     value: string
   ) => {
     updateBooking(id, { [dateField]: value || null });
+  };
+
+  const handlePoliceFileChange = async (booking: BookingRow, file?: File) => {
+    if (!file) return;
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `${booking.id}/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('police-registrations')
+        .upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      await updateBooking(booking.id, { police_registration_file: path });
+      toast.success('Photo attached');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to upload photo');
+    }
+  };
+
+  const handleViewPoliceFile = async (path: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('police-registrations')
+        .createSignedUrl(path, 60);
+      if (error) throw error;
+      if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to open photo');
+    }
   };
 
   return (
@@ -300,6 +345,7 @@ export default function TodoPage() {
             <option value="PENDING CONFIRMATION">Pending Confirmation</option>
             <option value="CHECKED IN">Checked In</option>
             <option value="CHECKED OUT">Checked Out</option>
+            <option value="COMPLETED">Completed</option>
           </select>
           <select
             value={filters.police_registration}
@@ -344,7 +390,7 @@ export default function TodoPage() {
         </div>
       ) : (
         <div className="card overflow-x-auto">
-          <table className="table">
+          <table className="table text-xs [&_th]:text-xs [&_th]:px-2 [&_th]:py-1.5 [&_td]:text-xs [&_td]:px-2 [&_td]:py-1.5">
             <thead>
               <tr>
                 <SortableHeader column="apartment">Apartment</SortableHeader>
@@ -374,7 +420,7 @@ export default function TodoPage() {
                       <td className="whitespace-nowrap">{b.apartment?.name}</td>
                       <td className="whitespace-nowrap">
                         <div>{b.guest_name}</div>
-                        <div className="text-xs text-gray-400">{b.booking_ref}</div>
+                        <div className="text-gray-400">{b.booking_ref}</div>
                       </td>
                       <td className="whitespace-nowrap">{formatDate(b.check_in_date)}</td>
                       <td className="whitespace-nowrap">{formatDate(b.check_out_date)}</td>
@@ -382,36 +428,48 @@ export default function TodoPage() {
                         <StatusBadge status={todoStatus} />
                       </td>
                       <td>
-                        <div className="flex gap-2 items-center">
+                        <div className="flex gap-1.5 items-center">
                           <StatusSquare
                             value={b.police_registration}
                             doneValue="DONE"
                             onChange={(value) =>
-                              handleTaskStatusChange(
-                                b,
-                                'police_registration',
-                                'police_registration_date',
-                                value
-                              )
+                              handleTaskStatusChange(b, 'police_registration', null, value)
                             }
                           />
                           <input
-                            type="date"
-                            value={b.police_registration_date || ''}
+                            type="file"
+                            accept="image/*"
+                            ref={(el) => {
+                              fileInputRefs.current[b.id] = el;
+                            }}
+                            className="hidden"
                             onChange={(e) =>
-                              handleDateChange(
-                                b.id,
-                                'police_registration_date',
-                                e.target.value
-                              )
+                              handlePoliceFileChange(b, e.target.files?.[0] || undefined)
                             }
-                            disabled={b.police_registration !== 'DONE'}
-                            className="input"
                           />
+                          {b.police_registration_file ? (
+                            <button
+                              type="button"
+                              onClick={() => handleViewPoliceFile(b.police_registration_file!)}
+                              title="View attached photo"
+                              className="p-1 hover:bg-gray-200 rounded"
+                            >
+                              <ImageIcon size={14} className="text-gray-600" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => fileInputRefs.current[b.id]?.click()}
+                              title="Attach photo"
+                              className="p-1 hover:bg-gray-200 rounded"
+                            >
+                              <Plus size={14} className="text-gray-500" />
+                            </button>
+                          )}
                         </div>
                       </td>
                       <td>
-                        <div className="flex gap-2 items-center">
+                        <div className="flex gap-1.5 items-center">
                           <StatusSquare
                             value={b.platform_invoice}
                             doneValue="SENT"
@@ -435,7 +493,7 @@ export default function TodoPage() {
                               )
                             }
                             disabled={b.platform_invoice !== 'SENT'}
-                            className="input"
+                            className="input w-28 text-xs px-1.5 py-1"
                           />
                         </div>
                       </td>
