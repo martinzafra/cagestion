@@ -14,8 +14,9 @@ interface BookingsListProps {
 }
 
 type SortColumn =
-  | 'guest_name'
   | 'apartment'
+  | 'booking_ref'
+  | 'guest_name'
   | 'check_in_date'
   | 'check_out_date'
   | 'nights'
@@ -61,6 +62,8 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
         return booking.guest_name?.toLowerCase() || '';
       case 'apartment':
         return booking.apartment?.name?.toLowerCase() || '';
+      case 'booking_ref':
+        return booking.booking_ref?.toLowerCase() || '';
       case 'check_in_date':
         return booking.check_in_date || '';
       case 'check_out_date':
@@ -86,12 +89,15 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
       })
     : bookings;
 
-  const SortableHeader: React.FC<{ column: SortColumn; children: React.ReactNode }> = ({
-    column,
-    children,
-  }) => (
+  const SortableHeader: React.FC<{
+    column: SortColumn;
+    children: React.ReactNode;
+    align?: 'left' | 'right';
+  }> = ({ column, children, align = 'left' }) => (
     <th
-      className="cursor-pointer select-none hover:bg-gray-200"
+      className={`cursor-pointer select-none hover:bg-gray-200 ${
+        align === 'right' ? 'text-right' : ''
+      }`}
       onClick={() => handleSort(column)}
     >
       <span className="inline-flex items-center gap-1">
@@ -107,12 +113,13 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
       <table className="table">
         <thead>
           <tr>
-            <SortableHeader column="guest_name">Guest</SortableHeader>
             <SortableHeader column="apartment">Apartment</SortableHeader>
+            <SortableHeader column="booking_ref">Booking Ref</SortableHeader>
+            <SortableHeader column="guest_name">Guest</SortableHeader>
             <SortableHeader column="check_in_date">Check-in</SortableHeader>
             <SortableHeader column="check_out_date">Check-out</SortableHeader>
             <SortableHeader column="nights">Nights</SortableHeader>
-            <SortableHeader column="guest_total_amount">Total</SortableHeader>
+            <SortableHeader column="guest_total_amount" align="right">Total Amount</SortableHeader>
             <SortableHeader column="status">Status</SortableHeader>
             <th>Actions</th>
           </tr>
@@ -120,7 +127,7 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
         <tbody>
           {sortedBookings.length === 0 ? (
             <tr>
-              <td colSpan={8} className="text-center py-8 text-gray-500">
+              <td colSpan={9} className="text-center py-8 text-gray-500">
                 No bookings found
               </td>
             </tr>
@@ -133,12 +140,13 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
                   setExpandedId(expandedId === booking.id ? null : booking.id)
                 }
               >
-                <td className="font-medium">{booking.guest_name}</td>
                 <td>{booking.apartment?.name}</td>
+                <td>{booking.booking_ref}</td>
+                <td className="font-medium">{booking.guest_name}</td>
                 <td>{formatDate(booking.check_in_date)}</td>
                 <td>{formatDate(booking.check_out_date)}</td>
                 <td>{booking.nights}</td>
-                <td className="font-semibold">
+                <td className="font-semibold text-right">
                   {formatCurrency(booking.guest_total_amount || 0)}
                 </td>
                 <td>

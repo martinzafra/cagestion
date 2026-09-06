@@ -14,7 +14,7 @@ interface BookingRow {
   id: string;
   booking_ref: string;
   guest_name: string;
-  status: 'CONFIRMED' | 'PENDING CONFIRMATION' | 'CANCELLED';
+  status: 'CONFIRMED' | 'PENDING CONFIRMATION' | 'CANCELLED' | 'FINISHED';
   check_in_date: string;
   check_out_date: string;
   apartment_id: string;
@@ -157,6 +157,12 @@ export default function TodoPage() {
     }
     if (value === 'NA') {
       updates[dateField] = null;
+    }
+    // Final liquidation sent closes the booking out; un-sending it re-opens
+    // the booking rather than leaving it stuck as Finished.
+    if (field === 'final_liquidation' && booking.status !== 'CANCELLED') {
+      if (value === 'SENT') updates.status = 'FINISHED';
+      else if (booking.status === 'FINISHED') updates.status = 'CONFIRMED';
     }
     updateBooking(booking.id, updates);
   };

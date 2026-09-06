@@ -28,7 +28,7 @@ export type Database = {
           agent_id: string;
           apartment_id: string;
           platform_id: string;
-          status: 'CONFIRMED' | 'PENDING CONFIRMATION' | 'CANCELLED';
+          status: 'CONFIRMED' | 'PENDING CONFIRMATION' | 'CANCELLED' | 'FINISHED';
           guest_name: string;
           guest_phone: string | null;
           guest_email: string | null;

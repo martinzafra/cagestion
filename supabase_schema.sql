@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Enum types
 CREATE TYPE user_role AS ENUM ('admin', 'agent');
-CREATE TYPE booking_status AS ENUM ('CONFIRMED', 'PENDING CONFIRMATION', 'CANCELLED');
+CREATE TYPE booking_status AS ENUM ('CONFIRMED', 'PENDING CONFIRMATION', 'CANCELLED', 'FINISHED');
 CREATE TYPE price_basis AS ENUM ('DAY', 'WEEK', 'MONTH');
 CREATE TYPE task_status AS ENUM ('TO BE DONE', 'DONE', 'NA');
 CREATE TYPE invoice_status AS ENUM ('TO BE DONE', 'SENT', 'NA');

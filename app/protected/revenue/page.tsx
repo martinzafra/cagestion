@@ -2,9 +2,21 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, Pencil, Download } from 'lucide-react';
+import { Plus, Trash2, Pencil, Download, ChevronUp, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDate, formatCurrency } from '@/lib/calculations';
+
+type SortColumn =
+  | 'revenue_type'
+  | 'revenue_number'
+  | 'revenue_date'
+  | 'guest_name'
+  | 'apartment'
+  | 'item'
+  | 'total_services'
+  | 'commission_percentage'
+  | 'amount'
+  | 'status';
 
 const blankFormData = {
   revenue_type: 'INVOICE' as 'INVOICE' | 'COLLECTION',
@@ -37,6 +49,9 @@ export default function RevenuePage() {
   });
 
   const [formData, setFormData] = useState(blankFormData);
+
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     fetchData();
@@ -174,6 +189,73 @@ export default function RevenuePage() {
     }
     return true;
   });
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn !== column) {
+      setSortColumn(column);
+      setSortDirection('asc');
+    } else if (sortDirection === 'asc') {
+      setSortDirection('desc');
+    } else {
+      setSortColumn(null);
+    }
+  };
+
+  const getSortValue = (rev: any, column: SortColumn) => {
+    switch (column) {
+      case 'revenue_type':
+        return rev.revenue_type || '';
+      case 'revenue_number':
+        return rev.revenue_number || 0;
+      case 'revenue_date':
+        return rev.revenue_date || '';
+      case 'guest_name':
+        return rev.booking?.guest_name?.toLowerCase() || '';
+      case 'apartment':
+        return rev.apartment?.name?.toLowerCase() || '';
+      case 'item':
+        return rev.item?.name?.toLowerCase() || '';
+      case 'total_services':
+        return rev.total_services || 0;
+      case 'commission_percentage':
+        return rev.commission_percentage || 0;
+      case 'amount':
+        return rev.amount || 0;
+      case 'status':
+        return rev.issued ? 1 : 0;
+      default:
+        return '';
+    }
+  };
+
+  const sortedRevenues = sortColumn
+    ? [...filteredRevenues].sort((a, b) => {
+        const va = getSortValue(a, sortColumn);
+        const vb = getSortValue(b, sortColumn);
+        if (va < vb) return sortDirection === 'asc' ? -1 : 1;
+        if (va > vb) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      })
+    : filteredRevenues;
+
+  const SortableHeader: React.FC<{
+    column: SortColumn;
+    children: React.ReactNode;
+    align?: 'left' | 'right';
+  }> = ({ column, children, align = 'left' }) => (
+    <th
+      className={`cursor-pointer select-none hover:bg-gray-200 ${
+        align === 'right' ? 'text-right' : ''
+      }`}
+      onClick={() => handleSort(column)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {children}
+        {sortColumn === column &&
+          (sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+      </span>
+    </th>
+  );
 
   return (
     <div className="space-y-6">
@@ -431,28 +513,28 @@ export default function RevenuePage() {
           <table className="table">
             <thead>
               <tr>
-                <th>Type</th>
-                <th>Invoice #</th>
-                <th>Date</th>
-                <th>Guest</th>
-                <th>Apartment</th>
-                <th>Item</th>
-                <th>Services €</th>
-                <th>Commission %</th>
-                <th>Amount €</th>
-                <th>Status</th>
+                <SortableHeader column="revenue_type">Type</SortableHeader>
+                <SortableHeader column="revenue_number">Invoice #</SortableHeader>
+                <SortableHeader column="revenue_date">Date</SortableHeader>
+                <SortableHeader column="guest_name">Guest</SortableHeader>
+                <SortableHeader column="apartment">Apartment</SortableHeader>
+                <SortableHeader column="item">Item</SortableHeader>
+                <SortableHeader column="total_services" align="right">Services €</SortableHeader>
+                <SortableHeader column="commission_percentage">Commission %</SortableHeader>
+                <SortableHeader column="amount" align="right">Amount €</SortableHeader>
+                <SortableHeader column="status">Status</SortableHeader>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredRevenues.length === 0 ? (
+              {sortedRevenues.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="text-center py-8 text-gray-500">
                     No revenue entries
                   </td>
                 </tr>
               ) : (
-                filteredRevenues.map((rev) => (
+                sortedRevenues.map((rev) => (
                   <tr key={rev.id}>
                     <td className="text-sm">{rev.revenue_type}</td>
                     <td className="font-mono text-sm">{rev.revenue_number}</td>
@@ -460,14 +542,14 @@ export default function RevenuePage() {
                     <td className="font-medium">{rev.booking?.guest_name}</td>
                     <td>{rev.apartment?.name}</td>
                     <td>{rev.item?.name}</td>
-                    <td>{formatCurrency(rev.total_services)}</td>
+                    <td className="text-right">{formatCurrency(rev.total_services)}</td>
                     <td>{rev.commission_percentage}%</td>
-                    <td className="font-semibold">
+                    <td className="font-semibold text-right">
                       {formatCurrency(rev.amount)}
                     </td>
                     <td>
                       <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
+                        className={`px-2 py-1 rounded text-xs font-medium uppercase ${
                           rev.issued
                             ? 'bg-green-100 text-green-800'
                             : 'bg-yellow-100 text-yellow-800'

@@ -48,7 +48,7 @@ export default function BookingsPage() {
           platform:inventory_platforms(name),
           payment_type:inventory_payment_types(name)
         `)
-        .order('check_in_date', { ascending: true });
+        .order('check_in_date', { ascending: false });
 
       if (error) throw error;
       setBookings(data || []);
@@ -234,6 +234,7 @@ export default function BookingsPage() {
                 <option value="">All Statuses</option>
                 <option value="CONFIRMED">Confirmed</option>
                 <option value="PENDING CONFIRMATION">Pending Confirmation</option>
+                <option value="FINISHED">Finished</option>
                 <option value="CANCELLED">Cancelled</option>
               </select>
               <input

@@ -369,9 +369,9 @@ export default function ExpensesPage() {
                 <th>Vendor</th>
                 <th>Date</th>
                 <th>Apartment</th>
-                <th>Amount €</th>
-                <th>VAT €</th>
-                <th>Total €</th>
+                <th className="text-right">Amount €</th>
+                <th className="text-right">VAT €</th>
+                <th className="text-right">Total €</th>
                 <th>Booking</th>
                 <th>Actions</th>
               </tr>
@@ -391,9 +391,9 @@ export default function ExpensesPage() {
                     <td className="font-medium">{exp.vendor}</td>
                     <td>{formatDate(exp.expense_date)}</td>
                     <td>{exp.apartment?.name}</td>
-                    <td>{formatCurrency(exp.amount)}</td>
-                    <td>{formatCurrency(exp.vat)}</td>
-                    <td className="font-semibold">{formatCurrency(exp.total)}</td>
+                    <td className="text-right">{formatCurrency(exp.amount)}</td>
+                    <td className="text-right">{formatCurrency(exp.vat)}</td>
+                    <td className="font-semibold text-right">{formatCurrency(exp.total)}</td>
                     <td>{exp.booking?.guest_name || 'General'}</td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <div className="flex gap-1">
