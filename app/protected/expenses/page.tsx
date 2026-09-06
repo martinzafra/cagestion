@@ -2,31 +2,34 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDate, formatCurrency } from '@/lib/calculations';
+
+const blankFormData = {
+  expense_type: 'INVOICE' as 'INVOICE' | 'PAYMENT',
+  expense_category_id: '',
+  vendor: '',
+  expense_date: new Date().toISOString().split('T')[0],
+  invoice_number: '',
+  amount: 0,
+  vat: 0,
+  apartment_id: '',
+  booking_id: '',
+  comments: '',
+  attachment_url: '',
+};
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | undefined>(undefined);
   const [apartments, setApartments] = useState<any[]>([]);
   const [expenseTypes, setExpenseTypes] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
 
-  const [formData, setFormData] = useState({
-    expense_type: 'INVOICE' as 'INVOICE' | 'PAYMENT',
-    expense_category_id: '',
-    vendor: '',
-    expense_date: new Date().toISOString().split('T')[0],
-    invoice_number: '',
-    amount: 0,
-    vat: 0,
-    apartment_id: '',
-    booking_id: '',
-    comments: '',
-    attachment_url: '',
-  });
+  const [formData, setFormData] = useState(blankFormData);
 
   useEffect(() => {
     fetchData();
@@ -73,42 +76,62 @@ export default function ExpensesPage() {
     }
 
     try {
-      const { error } = await supabase.from('expenses').insert([
-        {
-          expense_type: formData.expense_type,
-          expense_category_id: formData.expense_category_id,
-          vendor: formData.vendor,
-          expense_date: formData.expense_date,
-          invoice_number: formData.invoice_number || null,
-          amount: formData.amount,
-          vat: formData.vat || 0,
-          apartment_id: formData.apartment_id,
-          booking_id: formData.booking_id || null,
-          comments: formData.comments || null,
-          attachment_url: formData.attachment_url || null,
-        },
-      ]);
+      const payload = {
+        expense_type: formData.expense_type,
+        expense_category_id: formData.expense_category_id,
+        vendor: formData.vendor,
+        expense_date: formData.expense_date,
+        invoice_number: formData.invoice_number || null,
+        amount: formData.amount,
+        vat: formData.vat || 0,
+        apartment_id: formData.apartment_id,
+        booking_id: formData.booking_id || null,
+        comments: formData.comments || null,
+        attachment_url: formData.attachment_url || null,
+      };
 
-      if (error) throw error;
-      toast.success('Expense recorded');
+      if (editingExpenseId) {
+        const { error } = await supabase
+          .from('expenses')
+          .update(payload)
+          .eq('id', editingExpenseId);
+        if (error) throw error;
+        toast.success('Expense updated');
+      } else {
+        const { error } = await supabase.from('expenses').insert([payload]);
+        if (error) throw error;
+        toast.success('Expense recorded');
+      }
+
       setShowForm(false);
+      setEditingExpenseId(undefined);
       fetchData();
-      setFormData({
-        expense_type: 'INVOICE',
-        expense_category_id: '',
-        vendor: '',
-        expense_date: new Date().toISOString().split('T')[0],
-        invoice_number: '',
-        amount: 0,
-        vat: 0,
-        apartment_id: '',
-        booking_id: '',
-        comments: '',
-        attachment_url: '',
-      });
+      setFormData(blankFormData);
     } catch (error: any) {
       toast.error(error.message);
     }
+  };
+
+  const handleEditExpense = (id: string) => {
+    const exp = expenses.find((e) => e.id === id);
+    if (!exp) return;
+
+    setEditingExpenseId(id);
+    setFormData({
+      expense_type: exp.expense_type,
+      expense_category_id: exp.expense_category_id,
+      vendor: exp.vendor,
+      expense_date: exp.expense_date,
+      invoice_number: exp.invoice_number || '',
+      amount: exp.amount,
+      vat: exp.vat || 0,
+      apartment_id: exp.apartment_id,
+      booking_id: exp.booking_id || '',
+      comments: exp.comments || '',
+      attachment_url: exp.attachment_url || '',
+    });
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (id: string) => {
@@ -136,7 +159,11 @@ export default function ExpensesPage() {
           <p className="text-gray-600 mt-1">Track all property-related costs</p>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => {
+            setEditingExpenseId(undefined);
+            setFormData(blankFormData);
+            setShowForm((prev) => !prev);
+          }}
           className="btn-primary flex items-center gap-2"
         >
           <Plus size={18} />
@@ -146,7 +173,9 @@ export default function ExpensesPage() {
 
       {showForm && (
         <div className="card">
-          <h2 className="text-xl font-bold mb-4">Record Expense</h2>
+          <h2 className="text-xl font-bold mb-4">
+            {editingExpenseId ? 'Edit Expense' : 'Record Expense'}
+          </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -309,11 +338,14 @@ export default function ExpensesPage() {
 
             <div className="flex gap-3">
               <button type="submit" className="btn-primary">
-                Record Expense
+                {editingExpenseId ? 'Update Expense' : 'Record Expense'}
               </button>
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingExpenseId(undefined);
+                }}
                 className="btn-secondary"
               >
                 Cancel
@@ -364,12 +396,20 @@ export default function ExpensesPage() {
                     <td className="font-semibold">{formatCurrency(exp.total)}</td>
                     <td>{exp.booking?.guest_name || 'General'}</td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => handleDelete(exp.id)}
-                        className="p-1 hover:bg-red-100 rounded"
-                      >
-                        <Trash2 size={16} className="text-red-600" />
-                      </button>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => handleEditExpense(exp.id)}
+                          className="p-1 hover:bg-blue-100 rounded"
+                        >
+                          <Pencil size={16} className="text-blue-600" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(exp.id)}
+                          className="p-1 hover:bg-red-100 rounded"
+                        >
+                          <Trash2 size={16} className="text-red-600" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

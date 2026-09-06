@@ -2,14 +2,27 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, Download } from 'lucide-react';
+import { Plus, Trash2, Pencil, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDate, formatCurrency } from '@/lib/calculations';
+
+const blankFormData = {
+  revenue_type: 'INVOICE' as 'INVOICE' | 'COLLECTION',
+  revenue_date: new Date().toISOString().split('T')[0],
+  apartment_id: '',
+  booking_id: '',
+  invoice_item_id: '',
+  total_services: 0,
+  commission_percentage: 0,
+  issued: false,
+  attachment_url: '',
+};
 
 export default function RevenuePage() {
   const [revenues, setRevenues] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingRevenueId, setEditingRevenueId] = useState<string | undefined>(undefined);
   const [apartments, setApartments] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
   const [invoiceItems, setInvoiceItems] = useState<any[]>([]);
@@ -23,17 +36,7 @@ export default function RevenuePage() {
     search: '',
   });
 
-  const [formData, setFormData] = useState({
-    revenue_type: 'INVOICE' as 'INVOICE' | 'COLLECTION',
-    revenue_date: new Date().toISOString().split('T')[0],
-    apartment_id: '',
-    booking_id: '',
-    invoice_item_id: '',
-    total_services: 0,
-    commission_percentage: 0,
-    issued: false,
-    attachment_url: '',
-  });
+  const [formData, setFormData] = useState(blankFormData);
 
   useEffect(() => {
     fetchData();
@@ -80,38 +83,58 @@ export default function RevenuePage() {
     }
 
     try {
-      const { error } = await supabase.from('revenue_invoicing').insert([
-        {
-          revenue_type: formData.revenue_type,
-          revenue_date: formData.revenue_date,
-          apartment_id: formData.apartment_id,
-          booking_id: formData.booking_id,
-          invoice_item_id: formData.invoice_item_id,
-          total_services: formData.total_services,
-          commission_percentage: formData.commission_percentage,
-          issued: formData.issued,
-          attachment_url: formData.attachment_url || null,
-        },
-      ]);
+      const payload = {
+        revenue_type: formData.revenue_type,
+        revenue_date: formData.revenue_date,
+        apartment_id: formData.apartment_id,
+        booking_id: formData.booking_id,
+        invoice_item_id: formData.invoice_item_id,
+        total_services: formData.total_services,
+        commission_percentage: formData.commission_percentage,
+        issued: formData.issued,
+        attachment_url: formData.attachment_url || null,
+      };
 
-      if (error) throw error;
-      toast.success('Revenue entry created');
+      if (editingRevenueId) {
+        const { error } = await supabase
+          .from('revenue_invoicing')
+          .update(payload)
+          .eq('id', editingRevenueId);
+        if (error) throw error;
+        toast.success('Revenue entry updated');
+      } else {
+        const { error } = await supabase.from('revenue_invoicing').insert([payload]);
+        if (error) throw error;
+        toast.success('Revenue entry created');
+      }
+
       setShowForm(false);
+      setEditingRevenueId(undefined);
       fetchData();
-      setFormData({
-        revenue_type: 'INVOICE',
-        revenue_date: new Date().toISOString().split('T')[0],
-        apartment_id: '',
-        booking_id: '',
-        invoice_item_id: '',
-        total_services: 0,
-        commission_percentage: 0,
-        issued: false,
-        attachment_url: '',
-      });
+      setFormData(blankFormData);
     } catch (error: any) {
       toast.error(error.message);
     }
+  };
+
+  const handleEditRevenue = (id: string) => {
+    const rev = revenues.find((r) => r.id === id);
+    if (!rev) return;
+
+    setEditingRevenueId(id);
+    setFormData({
+      revenue_type: rev.revenue_type,
+      revenue_date: rev.revenue_date,
+      apartment_id: rev.apartment_id,
+      booking_id: rev.booking_id,
+      invoice_item_id: rev.invoice_item_id,
+      total_services: rev.total_services,
+      commission_percentage: rev.commission_percentage,
+      issued: rev.issued,
+      attachment_url: rev.attachment_url || '',
+    });
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (id: string) => {
@@ -160,7 +183,11 @@ export default function RevenuePage() {
           <p className="text-gray-600 mt-1">Manage income from bookings</p>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => {
+            setEditingRevenueId(undefined);
+            setFormData(blankFormData);
+            setShowForm((prev) => !prev);
+          }}
           className="btn-primary flex items-center gap-2"
         >
           <Plus size={18} />
@@ -170,7 +197,9 @@ export default function RevenuePage() {
 
       {showForm && (
         <div className="card">
-          <h2 className="text-xl font-bold mb-4">Add Revenue Entry</h2>
+          <h2 className="text-xl font-bold mb-4">
+            {editingRevenueId ? 'Edit Revenue Entry' : 'Add Revenue Entry'}
+          </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -312,11 +341,14 @@ export default function RevenuePage() {
                 type="submit"
                 className="btn-primary"
               >
-                Create Entry
+                {editingRevenueId ? 'Update Entry' : 'Create Entry'}
               </button>
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingRevenueId(undefined);
+                }}
                 className="btn-secondary"
               >
                 Cancel
@@ -445,12 +477,20 @@ export default function RevenuePage() {
                       </span>
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => handleDelete(rev.id)}
-                        className="p-1 hover:bg-red-100 rounded"
-                      >
-                        <Trash2 size={16} className="text-red-600" />
-                      </button>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => handleEditRevenue(rev.id)}
+                          className="p-1 hover:bg-blue-100 rounded"
+                        >
+                          <Pencil size={16} className="text-blue-600" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(rev.id)}
+                          className="p-1 hover:bg-red-100 rounded"
+                        >
+                          <Trash2 size={16} className="text-red-600" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
