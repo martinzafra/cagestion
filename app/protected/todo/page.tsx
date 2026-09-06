@@ -6,9 +6,20 @@ import toast from 'react-hot-toast';
 import StatusBadge from '@/components/StatusBadge';
 import StatusSquare from '@/components/StatusSquare';
 import { formatDate } from '@/lib/calculations';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 
 type TaskStatus = 'TO BE DONE' | 'DONE' | 'NA';
 type InvoiceStatus = 'TO BE DONE' | 'SENT' | 'NA';
+
+type SortColumn =
+  | 'apartment'
+  | 'guest_name'
+  | 'check_in_date'
+  | 'check_out_date'
+  | 'todo_status'
+  | 'police_registration'
+  | 'platform_invoice'
+  | 'final_liquidation';
 
 interface BookingRow {
   id: string;
@@ -60,6 +71,9 @@ export default function TodoPage() {
     platform_invoice: '',
     final_liquidation: '',
   });
+
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     fetchBookings();
@@ -131,6 +145,66 @@ export default function TodoPage() {
   const visibleBookings = showCompleted
     ? filteredBookings
     : filteredBookings.filter(isPending);
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn !== column) {
+      setSortColumn(column);
+      setSortDirection('asc');
+    } else if (sortDirection === 'asc') {
+      setSortDirection('desc');
+    } else {
+      setSortColumn(null);
+    }
+  };
+
+  const getSortValue = (b: BookingRow, column: SortColumn) => {
+    switch (column) {
+      case 'apartment':
+        return b.apartment?.name?.toLowerCase() || '';
+      case 'guest_name':
+        return b.guest_name?.toLowerCase() || '';
+      case 'check_in_date':
+        return b.check_in_date || '';
+      case 'check_out_date':
+        return b.check_out_date || '';
+      case 'todo_status':
+        return computeTodoStatus(b);
+      case 'police_registration':
+        return b.police_registration;
+      case 'platform_invoice':
+        return b.platform_invoice;
+      case 'final_liquidation':
+        return b.final_liquidation;
+      default:
+        return '';
+    }
+  };
+
+  const sortedBookings = sortColumn
+    ? [...visibleBookings].sort((a, b) => {
+        const va = getSortValue(a, sortColumn);
+        const vb = getSortValue(b, sortColumn);
+        if (va < vb) return sortDirection === 'asc' ? -1 : 1;
+        if (va > vb) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      })
+    : visibleBookings;
+
+  const SortableHeader: React.FC<{ column: SortColumn; children: React.ReactNode }> = ({
+    column,
+    children,
+  }) => (
+    <th
+      className="cursor-pointer select-none hover:bg-gray-200"
+      onClick={() => handleSort(column)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {children}
+        {sortColumn === column &&
+          (sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+      </span>
+    </th>
+  );
 
   const updateBooking = async (id: string, updates: Record<string, any>) => {
     try {
@@ -273,26 +347,27 @@ export default function TodoPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>Apartment</th>
-                <th>Booking</th>
-                <th>Check-out</th>
-                <th>To Do Status</th>
-                <th>Police Registration</th>
-                <th>Platform Invoice</th>
-                <th>Final Liquidation</th>
+                <SortableHeader column="apartment">Apartment</SortableHeader>
+                <SortableHeader column="guest_name">Booking</SortableHeader>
+                <SortableHeader column="check_in_date">Check-in</SortableHeader>
+                <SortableHeader column="check_out_date">Check-out</SortableHeader>
+                <SortableHeader column="todo_status">To Do Status</SortableHeader>
+                <SortableHeader column="police_registration">Police Registration</SortableHeader>
+                <SortableHeader column="platform_invoice">Platform Invoice</SortableHeader>
+                <SortableHeader column="final_liquidation">Final Liquidation</SortableHeader>
               </tr>
             </thead>
             <tbody>
-              {visibleBookings.length === 0 ? (
+              {sortedBookings.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-gray-500">
+                  <td colSpan={8} className="text-center py-8 text-gray-500">
                     {showCompleted
                       ? 'No bookings found'
                       : 'No pending tasks — everything is up to date'}
                   </td>
                 </tr>
               ) : (
-                visibleBookings.map((b) => {
+                sortedBookings.map((b) => {
                   const todoStatus = computeTodoStatus(b);
                   return (
                     <tr key={b.id} className={ROW_TINT[todoStatus] || ''}>
@@ -301,6 +376,7 @@ export default function TodoPage() {
                         <div>{b.guest_name}</div>
                         <div className="text-xs text-gray-400">{b.booking_ref}</div>
                       </td>
+                      <td className="whitespace-nowrap">{formatDate(b.check_in_date)}</td>
                       <td className="whitespace-nowrap">{formatDate(b.check_out_date)}</td>
                       <td>
                         <StatusBadge status={todoStatus} />
