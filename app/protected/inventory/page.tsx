@@ -10,6 +10,9 @@ type InventoryType = 'agents' | 'apartments' | 'platforms' | 'expense_types' | '
 interface TabItem {
   id: string;
   name: string;
+  commission_percentage?: number;
+  contract?: 'None' | 'Yearly' | 'Unlimited';
+  contract_date?: string | null;
 }
 
 export default function InventoryPage() {
@@ -208,6 +211,26 @@ export default function InventoryPage() {
     }
   };
 
+  const handleApartmentFieldChange = (
+    id: string,
+    field: 'commission_percentage' | 'contract' | 'contract_date',
+    value: any
+  ) => {
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)));
+  };
+
+  const persistApartmentField = async (id: string, field: string, value: any) => {
+    try {
+      const { error } = await supabase
+        .from('inventory_apartments')
+        .update({ [field]: value })
+        .eq('id', id);
+      if (error) throw error;
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update apartment');
+    }
+  };
+
   const handleDeleteItem = async (id: string) => {
     if (!confirm('Delete this item?')) return;
 
@@ -368,6 +391,62 @@ export default function InventoryPage() {
                   </>
                 )}
               </div>
+              {activeTab === 'apartments' && (
+                <div className="mt-3 pt-3 border-t grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-xs text-gray-500">Commission %</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={item.commission_percentage ?? 0}
+                      onChange={(e) =>
+                        handleApartmentFieldChange(
+                          item.id,
+                          'commission_percentage',
+                          parseFloat(e.target.value) || 0
+                        )
+                      }
+                      onBlur={(e) =>
+                        persistApartmentField(
+                          item.id,
+                          'commission_percentage',
+                          parseFloat(e.target.value) || 0
+                        )
+                      }
+                      className="input text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Contract</label>
+                    <select
+                      value={item.contract ?? 'None'}
+                      onChange={(e) => {
+                        handleApartmentFieldChange(item.id, 'contract', e.target.value as any);
+                        persistApartmentField(item.id, 'contract', e.target.value);
+                      }}
+                      className="select text-sm"
+                    >
+                      <option value="None">None</option>
+                      <option value="Yearly">Yearly</option>
+                      <option value="Unlimited">Unlimited</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Contract Date</label>
+                    <input
+                      type="date"
+                      value={item.contract_date ?? ''}
+                      onChange={(e) =>
+                        handleApartmentFieldChange(item.id, 'contract_date', e.target.value || null)
+                      }
+                      onBlur={(e) =>
+                        persistApartmentField(item.id, 'contract_date', e.target.value || null)
+                      }
+                      className="input text-sm"
+                    />
+                  </div>
+                </div>
+              )}
               {activeTab === 'apartments' && allAgents.length > 0 && (
                 <div className="mt-3 pt-3 border-t flex flex-wrap gap-3">
                   <span className="text-xs text-gray-500 w-full">Enabled agents:</span>

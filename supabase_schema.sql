@@ -10,6 +10,7 @@ CREATE TYPE invoice_status AS ENUM ('TO BE DONE', 'SENT', 'NA');
 CREATE TYPE revenue_type AS ENUM ('INVOICE', 'COLLECTION');
 CREATE TYPE expense_type_enum AS ENUM ('INVOICE', 'PAYMENT');
 CREATE TYPE yes_no_na AS ENUM ('Y', 'N', 'NA');
+CREATE TYPE apartment_contract_type AS ENUM ('None', 'Yearly', 'Unlimited');
 
 -- Users table (extends auth.users)
 CREATE TABLE IF NOT EXISTS users (
@@ -31,7 +32,10 @@ CREATE TABLE IF NOT EXISTS inventory_agents (
 
 CREATE TABLE IF NOT EXISTS inventory_apartments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name TEXT UNIQUE NOT NULL, -- 'Barbarita', 'TMB', 'Catamaran', 'Cas Artur', 'Alexandrite'
+  name TEXT UNIQUE NOT NULL, -- 'Barbarita', 'TMB', 'Catamaran', 'Casa Artur', 'Alexandrite'
+  commission_percentage DECIMAL(5, 2) DEFAULT 0,
+  contract apartment_contract_type NOT NULL DEFAULT 'None',
+  contract_date DATE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
