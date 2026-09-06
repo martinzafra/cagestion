@@ -13,6 +13,7 @@ interface TabItem {
   commission_percentage?: number;
   contract?: 'None' | 'Yearly' | 'Unlimited';
   contract_date?: string | null;
+  active?: boolean;
 }
 
 export default function InventoryPage() {
@@ -26,6 +27,7 @@ export default function InventoryPage() {
   const [editingValue, setEditingValue] = useState('');
   const [allAgents, setAllAgents] = useState<TabItem[]>([]);
   const [agentApartments, setAgentApartments] = useState<Set<string>>(new Set());
+  const [showInactive, setShowInactive] = useState(false);
 
   const tables: { [key in InventoryType]: string } = {
     agents: 'inventory_agents',
@@ -213,7 +215,7 @@ export default function InventoryPage() {
 
   const handleApartmentFieldChange = (
     id: string,
-    field: 'commission_percentage' | 'contract' | 'contract_date',
+    field: 'commission_percentage' | 'contract' | 'contract_date' | 'active',
     value: any
   ) => {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)));
@@ -248,6 +250,11 @@ export default function InventoryPage() {
       toast.error(error.message);
     }
   };
+
+  const displayedItems =
+    activeTab === 'apartments' && !showInactive
+      ? items.filter((it) => it.active !== false)
+      : items;
 
   if (!userRole || userRole !== 'admin') {
     return (
@@ -318,22 +325,34 @@ export default function InventoryPage() {
       )}
 
       {!showAddForm && (
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="btn-primary flex items-center gap-2"
-        >
-          <Plus size={18} />
-          Add {tabLabels[activeTab]}
-        </button>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus size={18} />
+            Add {tabLabels[activeTab]}
+          </button>
+          {activeTab === 'apartments' && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer text-gray-700">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+              />
+              Show Properties Not Active
+            </label>
+          )}
+        </div>
       )}
 
       {/* Items List */}
       <div className="card">
-        {items.length === 0 ? (
+        {displayedItems.length === 0 ? (
           <p className="text-center py-8 text-gray-500">No items yet</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((item) => (
+            {displayedItems.map((item) => (
               <div
                 key={item.id}
                 className="p-4 border rounded-lg hover:bg-gray-50"
@@ -371,7 +390,22 @@ export default function InventoryPage() {
                   </>
                 ) : (
                   <>
-                    <span className="font-medium">{item.name}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium">{item.name}</span>
+                      {activeTab === 'apartments' && (
+                        <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={item.active !== false}
+                            onChange={(e) => {
+                              handleApartmentFieldChange(item.id, 'active', e.target.checked);
+                              persistApartmentField(item.id, 'active', e.target.checked);
+                            }}
+                          />
+                          Active
+                        </label>
+                      )}
+                    </div>
                     <div className="flex gap-1">
                       <button
                         onClick={() => handleStartEdit(item)}

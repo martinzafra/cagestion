@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS inventory_apartments (
   commission_percentage DECIMAL(5, 2) DEFAULT 0,
   contract apartment_contract_type NOT NULL DEFAULT 'None',
   contract_date DATE,
+  active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
