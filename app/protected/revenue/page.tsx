@@ -14,6 +14,15 @@ export default function RevenuePage() {
   const [bookings, setBookings] = useState<any[]>([]);
   const [invoiceItems, setInvoiceItems] = useState<any[]>([]);
 
+  const [listFilters, setListFilters] = useState({
+    apartment_id: '',
+    revenue_type: '',
+    status: '',
+    dateFrom: '',
+    dateTo: '',
+    search: '',
+  });
+
   const [formData, setFormData] = useState({
     revenue_type: 'INVOICE' as 'INVOICE' | 'COLLECTION',
     revenue_date: new Date().toISOString().split('T')[0],
@@ -125,6 +134,23 @@ export default function RevenuePage() {
   const getBookingDisplay = (booking: any) => {
     return `${booking.guest_name} - ${formatDate(booking.check_in_date)} - ${booking.booking_ref}`;
   };
+
+  const filteredRevenues = revenues.filter((rev) => {
+    if (listFilters.apartment_id && rev.apartment_id !== listFilters.apartment_id) return false;
+    if (listFilters.revenue_type && rev.revenue_type !== listFilters.revenue_type) return false;
+    if (listFilters.status === 'issued' && !rev.issued) return false;
+    if (listFilters.status === 'draft' && rev.issued) return false;
+    if (listFilters.dateFrom && rev.revenue_date < listFilters.dateFrom) return false;
+    if (listFilters.dateTo && rev.revenue_date > listFilters.dateTo) return false;
+    if (listFilters.search) {
+      const q = listFilters.search.toLowerCase();
+      const matches =
+        rev.booking?.guest_name?.toLowerCase().includes(q) ||
+        String(rev.revenue_number).includes(q);
+      if (!matches) return false;
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -305,7 +331,71 @@ export default function RevenuePage() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
       ) : (
-        <div className="card overflow-x-auto">
+        <>
+          {/* Filter line */}
+          <div className="card">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              <select
+                value={listFilters.apartment_id}
+                onChange={(e) =>
+                  setListFilters({ ...listFilters, apartment_id: e.target.value })
+                }
+                className="select"
+              >
+                <option value="">All Apartments</option>
+                {apartments.map((apt) => (
+                  <option key={apt.id} value={apt.id}>
+                    {apt.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={listFilters.revenue_type}
+                onChange={(e) =>
+                  setListFilters({ ...listFilters, revenue_type: e.target.value })
+                }
+                className="select"
+              >
+                <option value="">All Types</option>
+                <option value="INVOICE">Invoice</option>
+                <option value="COLLECTION">Collection</option>
+              </select>
+              <select
+                value={listFilters.status}
+                onChange={(e) => setListFilters({ ...listFilters, status: e.target.value })}
+                className="select"
+              >
+                <option value="">All Statuses</option>
+                <option value="issued">Issued</option>
+                <option value="draft">Draft</option>
+              </select>
+              <input
+                type="date"
+                title="Date from"
+                value={listFilters.dateFrom}
+                onChange={(e) =>
+                  setListFilters({ ...listFilters, dateFrom: e.target.value })
+                }
+                className="input"
+              />
+              <input
+                type="date"
+                title="Date to"
+                value={listFilters.dateTo}
+                onChange={(e) => setListFilters({ ...listFilters, dateTo: e.target.value })}
+                className="input"
+              />
+              <input
+                type="text"
+                placeholder="Search guest or invoice #..."
+                value={listFilters.search}
+                onChange={(e) => setListFilters({ ...listFilters, search: e.target.value })}
+                className="input"
+              />
+            </div>
+          </div>
+
+          <div className="card overflow-x-auto">
           <table className="table">
             <thead>
               <tr>
@@ -323,14 +413,14 @@ export default function RevenuePage() {
               </tr>
             </thead>
             <tbody>
-              {revenues.length === 0 ? (
+              {filteredRevenues.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="text-center py-8 text-gray-500">
                     No revenue entries
                   </td>
                 </tr>
               ) : (
-                revenues.map((rev) => (
+                filteredRevenues.map((rev) => (
                   <tr key={rev.id}>
                     <td className="text-sm">{rev.revenue_type}</td>
                     <td className="font-mono text-sm">{rev.revenue_number}</td>
@@ -367,7 +457,8 @@ export default function RevenuePage() {
               )}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
