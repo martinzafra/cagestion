@@ -292,7 +292,8 @@ export default function TodoPage() {
                     <tr key={b.id} className={ROW_TINT[todoStatus] || ''}>
                       <td className="whitespace-nowrap">{b.apartment?.name}</td>
                       <td className="whitespace-nowrap">
-                        {b.guest_name} <span className="text-gray-400">({b.booking_ref})</span>
+                        <div>{b.guest_name}</div>
+                        <div className="text-xs text-gray-400">{b.booking_ref}</div>
                       </td>
                       <td className="whitespace-nowrap">{formatDate(b.check_out_date)}</td>
                       <td>
