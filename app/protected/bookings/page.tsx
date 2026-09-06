@@ -20,6 +20,7 @@ export default function BookingsPage() {
   const [apartments, setApartments] = useState<any[]>([]);
   const [agents, setAgents] = useState<any[]>([]);
   const [calendarApartmentIds, setCalendarApartmentIds] = useState<string[]>([]);
+  const [showFinished, setShowFinished] = useState(false);
 
   const [listFilters, setListFilters] = useState({
     apartment_id: '',
@@ -114,6 +115,7 @@ export default function BookingsPage() {
   };
 
   const filteredBookings = bookings.filter((b) => {
+    if (!showFinished && b.status === 'FINISHED') return false;
     if (listFilters.apartment_id && b.apartment_id !== listFilters.apartment_id)
       return false;
     if (listFilters.agent_id && b.agent_id !== listFilters.agent_id) return false;
@@ -145,10 +147,20 @@ export default function BookingsPage() {
           <h1 className="text-3xl font-bold text-gray-900">Bookings</h1>
           <p className="text-gray-600 mt-1">Manage accommodation reservations</p>
         </div>
-        <button onClick={handleNewBooking} className="btn-primary flex items-center gap-2">
-          <Plus size={18} />
-          New Booking
-        </button>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showFinished}
+              onChange={(e) => setShowFinished(e.target.checked)}
+            />
+            Show FINISHED Bookings
+          </label>
+          <button onClick={handleNewBooking} className="btn-primary flex items-center gap-2">
+            <Plus size={18} />
+            New Booking
+          </button>
+        </div>
       </div>
 
       {showForm && (
