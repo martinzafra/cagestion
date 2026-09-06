@@ -147,20 +147,10 @@ export default function BookingsPage() {
           <h1 className="text-3xl font-bold text-gray-900">Bookings</h1>
           <p className="text-gray-600 mt-1">Manage accommodation reservations</p>
         </div>
-        <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showFinished}
-              onChange={(e) => setShowFinished(e.target.checked)}
-            />
-            Show FINISHED Bookings
-          </label>
-          <button onClick={handleNewBooking} className="btn-primary flex items-center gap-2">
-            <Plus size={18} />
-            New Booking
-          </button>
-        </div>
+        <button onClick={handleNewBooking} className="btn-primary flex items-center gap-2">
+          <Plus size={18} />
+          New Booking
+        </button>
       </div>
 
       {showForm && (
@@ -276,6 +266,14 @@ export default function BookingsPage() {
                 }
                 className="input"
               />
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showFinished}
+                  onChange={(e) => setShowFinished(e.target.checked)}
+                />
+                Show FINISHED Bookings
+              </label>
             </div>
           </div>
           <BookingsList
