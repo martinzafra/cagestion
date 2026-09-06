@@ -4,11 +4,14 @@
 -- zero rows for every user, admin included - RLS just filters out all rows
 -- rather than raising an error.
 
+DROP POLICY IF EXISTS "Users can delete bookings" ON bookings;
 CREATE POLICY "Users can delete bookings" ON bookings
   FOR DELETE USING (can_access_apartment(apartment_id));
 
+DROP POLICY IF EXISTS "Users can delete revenue" ON revenue_invoicing;
 CREATE POLICY "Users can delete revenue" ON revenue_invoicing
   FOR DELETE USING (can_access_apartment(apartment_id));
 
+DROP POLICY IF EXISTS "Users can delete expenses" ON expenses;
 CREATE POLICY "Users can delete expenses" ON expenses
   FOR DELETE USING (can_access_apartment(apartment_id));
