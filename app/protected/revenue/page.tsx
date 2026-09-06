@@ -5,10 +5,11 @@ import { supabase } from '@/lib/supabase';
 import { Plus, Trash2, Pencil, Download, ChevronUp, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDate, formatCurrency } from '@/lib/calculations';
+import { getApartmentColorMap } from '@/lib/apartmentColors';
 
 type SortColumn =
   | 'revenue_type'
-  | 'revenue_number'
+  | 'invoice_number'
   | 'revenue_date'
   | 'guest_name'
   | 'apartment'
@@ -20,6 +21,7 @@ type SortColumn =
 
 const blankFormData = {
   revenue_type: 'INVOICE' as 'INVOICE' | 'COLLECTION',
+  invoice_number: '',
   revenue_date: new Date().toISOString().split('T')[0],
   apartment_id: '',
   booking_id: '',
@@ -40,13 +42,13 @@ export default function RevenuePage() {
   const [invoiceItems, setInvoiceItems] = useState<any[]>([]);
 
   const [listFilters, setListFilters] = useState({
-    apartment_id: '',
     revenue_type: '',
     status: '',
     dateFrom: '',
     dateTo: '',
     search: '',
   });
+  const [apartmentFilterIds, setApartmentFilterIds] = useState<Set<string>>(new Set());
 
   const [formData, setFormData] = useState(blankFormData);
 
@@ -79,7 +81,12 @@ export default function RevenuePage() {
       ]);
 
       if (revenueRes.data) setRevenues(revenueRes.data);
-      if (aptRes.data) setApartments(aptRes.data);
+      if (aptRes.data) {
+        setApartments(aptRes.data);
+        setApartmentFilterIds((prev) =>
+          prev.size === 0 ? new Set(aptRes.data.map((a: any) => a.id)) : prev
+        );
+      }
       if (bookingsRes.data) setBookings(bookingsRes.data);
       if (itemsRes.data) setInvoiceItems(itemsRes.data);
     } catch (error) {
@@ -100,6 +107,7 @@ export default function RevenuePage() {
     try {
       const payload = {
         revenue_type: formData.revenue_type,
+        invoice_number: formData.invoice_number || null,
         revenue_date: formData.revenue_date,
         apartment_id: formData.apartment_id,
         booking_id: formData.booking_id,
@@ -139,6 +147,7 @@ export default function RevenuePage() {
     setEditingRevenueId(id);
     setFormData({
       revenue_type: rev.revenue_type,
+      invoice_number: rev.invoice_number || '',
       revenue_date: rev.revenue_date,
       apartment_id: rev.apartment_id,
       booking_id: rev.booking_id,
@@ -173,8 +182,19 @@ export default function RevenuePage() {
     return `${booking.guest_name} - ${formatDate(booking.check_in_date)} - ${booking.booking_ref}`;
   };
 
+  const toggleApartmentFilter = (id: string) => {
+    setApartmentFilterIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const apartmentColorMap = getApartmentColorMap(apartments);
+
   const filteredRevenues = revenues.filter((rev) => {
-    if (listFilters.apartment_id && rev.apartment_id !== listFilters.apartment_id) return false;
+    if (apartments.length > 0 && !apartmentFilterIds.has(rev.apartment_id)) return false;
     if (listFilters.revenue_type && rev.revenue_type !== listFilters.revenue_type) return false;
     if (listFilters.status === 'issued' && !rev.issued) return false;
     if (listFilters.status === 'draft' && rev.issued) return false;
@@ -184,7 +204,7 @@ export default function RevenuePage() {
       const q = listFilters.search.toLowerCase();
       const matches =
         rev.booking?.guest_name?.toLowerCase().includes(q) ||
-        String(rev.revenue_number).includes(q);
+        (rev.invoice_number || '').toLowerCase().includes(q);
       if (!matches) return false;
     }
     return true;
@@ -205,8 +225,8 @@ export default function RevenuePage() {
     switch (column) {
       case 'revenue_type':
         return rev.revenue_type || '';
-      case 'revenue_number':
-        return rev.revenue_number || 0;
+      case 'invoice_number':
+        return rev.invoice_number || '';
       case 'revenue_date':
         return rev.revenue_date || '';
       case 'guest_name':
@@ -283,7 +303,7 @@ export default function RevenuePage() {
             {editingRevenueId ? 'Edit Revenue Entry' : 'Add Revenue Entry'}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="label">Revenue Type *</label>
                 <select
@@ -299,6 +319,18 @@ export default function RevenuePage() {
                   <option value="INVOICE">Invoice</option>
                   <option value="COLLECTION">Collection</option>
                 </select>
+              </div>
+              <div>
+                <label className="label">Invoice #</label>
+                <input
+                  type="text"
+                  value={formData.invoice_number}
+                  onChange={(e) =>
+                    setFormData({ ...formData, invoice_number: e.target.value })
+                  }
+                  className="input"
+                  placeholder="e.g., 12 or C3"
+                />
               </div>
               <div>
                 <label className="label">Date *</label>
@@ -448,21 +480,30 @@ export default function RevenuePage() {
         <>
           {/* Filter line */}
           <div className="card">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <select
-                value={listFilters.apartment_id}
-                onChange={(e) =>
-                  setListFilters({ ...listFilters, apartment_id: e.target.value })
-                }
-                className="select"
-              >
-                <option value="">All Apartments</option>
-                {apartments.map((apt) => (
-                  <option key={apt.id} value={apt.id}>
-                    {apt.name}
-                  </option>
-                ))}
-              </select>
+            <div className="mb-3">
+              <label className="text-xs text-gray-500 block mb-1.5">Apartment</label>
+              <div className="flex flex-wrap gap-2">
+                {apartments.map((apt) => {
+                  const checked = apartmentFilterIds.has(apt.id);
+                  return (
+                    <label
+                      key={apt.id}
+                      className={`flex items-center gap-1.5 text-sm cursor-pointer px-2 py-1 rounded ${
+                        checked ? apartmentColorMap.get(apt.id)?.chip || 'bg-gray-100' : 'bg-gray-50 opacity-60'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleApartmentFilter(apt.id)}
+                      />
+                      {apt.name}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               <select
                 value={listFilters.revenue_type}
                 onChange={(e) =>
@@ -514,7 +555,7 @@ export default function RevenuePage() {
             <thead>
               <tr>
                 <SortableHeader column="revenue_type">Type</SortableHeader>
-                <SortableHeader column="revenue_number">Invoice #</SortableHeader>
+                <SortableHeader column="invoice_number">Invoice #</SortableHeader>
                 <SortableHeader column="revenue_date">Date</SortableHeader>
                 <SortableHeader column="guest_name">Guest</SortableHeader>
                 <SortableHeader column="apartment">Apartment</SortableHeader>
@@ -537,7 +578,7 @@ export default function RevenuePage() {
                 sortedRevenues.map((rev) => (
                   <tr key={rev.id}>
                     <td className="text-sm">{rev.revenue_type}</td>
-                    <td className="font-mono text-sm">{rev.revenue_number}</td>
+                    <td className="font-mono text-sm">{rev.invoice_number || '—'}</td>
                     <td>{formatDate(rev.revenue_date)}</td>
                     <td className="font-medium">{rev.booking?.guest_name}</td>
                     <td>{rev.apartment?.name}</td>

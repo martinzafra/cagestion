@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDate, formatCurrency } from '@/lib/calculations';
+import { getApartmentColorMap } from '@/lib/apartmentColors';
 
 const blankFormData = {
   expense_type: 'INVOICE' as 'INVOICE' | 'PAYMENT',
@@ -28,6 +29,7 @@ export default function ExpensesPage() {
   const [apartments, setApartments] = useState<any[]>([]);
   const [expenseTypes, setExpenseTypes] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
+  const [apartmentFilterIds, setApartmentFilterIds] = useState<Set<string>>(new Set());
 
   const [formData, setFormData] = useState(blankFormData);
 
@@ -57,7 +59,12 @@ export default function ExpensesPage() {
       ]);
 
       if (expRes.data) setExpenses(expRes.data);
-      if (aptRes.data) setApartments(aptRes.data);
+      if (aptRes.data) {
+        setApartments(aptRes.data);
+        setApartmentFilterIds((prev) =>
+          prev.size === 0 ? new Set(aptRes.data.map((a: any) => a.id)) : prev
+        );
+      }
       if (typesRes.data) setExpenseTypes(typesRes.data);
       if (bookingsRes.data) setBookings(bookingsRes.data);
     } catch (error) {
@@ -150,6 +157,24 @@ export default function ExpensesPage() {
       toast.error(error.message);
     }
   };
+
+  const toggleApartmentFilter = (id: string) => {
+    setApartmentFilterIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const apartmentColorMap = getApartmentColorMap(apartments);
+
+  const filteredExpenses = expenses.filter((exp) => {
+    // General expenses (no apartment) always show; apartment-tied ones
+    // are narrowed by the selected apartments.
+    if (!exp.apartment_id) return true;
+    return apartments.length === 0 || apartmentFilterIds.has(exp.apartment_id);
+  });
 
   return (
     <div className="space-y-6">
@@ -360,7 +385,33 @@ export default function ExpensesPage() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
       ) : (
-        <div className="card overflow-x-auto">
+        <>
+          {/* Filter line */}
+          <div className="card">
+            <label className="text-xs text-gray-500 block mb-1.5">Apartment</label>
+            <div className="flex flex-wrap gap-2">
+              {apartments.map((apt) => {
+                const checked = apartmentFilterIds.has(apt.id);
+                return (
+                  <label
+                    key={apt.id}
+                    className={`flex items-center gap-1.5 text-sm cursor-pointer px-2 py-1 rounded ${
+                      checked ? apartmentColorMap.get(apt.id)?.chip || 'bg-gray-100' : 'bg-gray-50 opacity-60'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleApartmentFilter(apt.id)}
+                    />
+                    {apt.name}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="card overflow-x-auto">
           <table className="table">
             <thead>
               <tr>
@@ -377,14 +428,14 @@ export default function ExpensesPage() {
               </tr>
             </thead>
             <tbody>
-              {expenses.length === 0 ? (
+              {filteredExpenses.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="text-center py-8 text-gray-500">
                     No expenses recorded
                   </td>
                 </tr>
               ) : (
-                expenses.map((exp) => (
+                filteredExpenses.map((exp) => (
                   <tr key={exp.id}>
                     <td className="text-sm">{exp.expense_type}</td>
                     <td>{exp.category?.name}</td>
@@ -416,7 +467,8 @@ export default function ExpensesPage() {
               )}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
