@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   platform_invoice_date DATE,
   final_liquidation invoice_status DEFAULT 'TO BE DONE',
   final_liquidation_date DATE,
+  inv_exp_done BOOLEAN NOT NULL DEFAULT FALSE,
   created_by UUID REFERENCES users(id),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

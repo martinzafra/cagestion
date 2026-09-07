@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import StatusBadge from '@/components/StatusBadge';
 import StatusSquare from '@/components/StatusSquare';
 import { formatDate } from '@/lib/calculations';
-import { ChevronUp, ChevronDown, Plus, Image as ImageIcon, X } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, Image as ImageIcon, X, Check } from 'lucide-react';
 import Switch from '@/components/Switch';
 import { fetchAllowedApartments } from '@/lib/apartmentAccess';
 import { compareSortValues } from '@/lib/sort';
@@ -39,13 +39,21 @@ interface BookingRow {
   platform_invoice_date: string | null;
   final_liquidation: InvoiceStatus;
   final_liquidation_date: string | null;
+  inv_exp_done: boolean;
 }
 
 const todayISO = () => new Date().toISOString().split('T')[0];
 
+// The ordered workflow this page walks a booking through - shown as the
+// chevron strip at the top of the page.
+const WORKFLOW_PHASES = ['CONFIRMED', 'CHECKED IN', 'CHECK OUT', 'TO INV/EXP', 'COMPLETED'];
+const WORKFLOW_COLORS = ['#E0A526', '#E2791C', '#C93B8F', '#7A4FA8', '#4A5FBD'];
+
 // A booking's admin tasks are done once each is either completed or marked
-// not applicable - nothing left in a "to be done" state.
-function isTaskComplete(b: BookingRow): boolean {
+// not applicable - nothing left in a "to be done" state. This is what moves
+// a booking into TO INV/EXP; it only reaches COMPLETED once inv_exp_done is
+// also set.
+function isAdminTasksComplete(b: BookingRow): boolean {
   return (
     (b.police_registration === 'DONE' || b.police_registration === 'NA') &&
     (b.platform_invoice === 'SENT' || b.platform_invoice === 'NA') &&
@@ -53,14 +61,17 @@ function isTaskComplete(b: BookingRow): boolean {
   );
 }
 
-// Computed automatically: all admin tasks done -> Completed, past checkout ->
-// Checked Out, past check-in -> Checked In, otherwise the booking hasn't
+// Computed automatically: admin tasks done + Inv/Exp reconciled -> Completed,
+// admin tasks done but Inv/Exp still pending -> To Inv/Exp, past checkout ->
+// Check Out, past check-in -> Checked In, otherwise the booking hasn't
 // started yet so show its reservation status (Confirmed / Pending
 // Confirmation / Cancelled).
 function computeTodoStatus(b: BookingRow): string {
-  if (isTaskComplete(b)) return 'COMPLETED';
+  const adminDone = isAdminTasksComplete(b);
+  if (adminDone && b.inv_exp_done) return 'COMPLETED';
+  if (adminDone) return 'TO INV/EXP';
   const today = todayISO();
-  if (today >= b.check_out_date) return 'CHECKED OUT';
+  if (today >= b.check_out_date) return 'CHECK OUT';
   if (today >= b.check_in_date) return 'CHECKED IN';
   return b.status;
 }
@@ -69,7 +80,8 @@ const ROW_TINT: Record<string, string> = {
   CONFIRMED: 'bg-green-50',
   'PENDING CONFIRMATION': 'bg-yellow-50',
   'CHECKED IN': 'bg-blue-50',
-  'CHECKED OUT': 'bg-gray-50',
+  'CHECK OUT': 'bg-gray-50',
+  'TO INV/EXP': 'bg-orange-50',
   COMPLETED: 'bg-purple-50',
 };
 
@@ -111,7 +123,8 @@ export default function TodoPage() {
           apartment_id, apartment:inventory_apartments(name),
           police_registration, police_registration_file,
           platform_invoice, platform_invoice_date,
-          final_liquidation, final_liquidation_date
+          final_liquidation, final_liquidation_date,
+          inv_exp_done
         `)
         .neq('status', 'CANCELLED')
         .order('check_in_date', { ascending: true });
@@ -119,7 +132,13 @@ export default function TodoPage() {
       if (error) throw error;
       const rows = (data as any) || [];
       setBookings(rows);
-      setPendingSnapshotIds(new Set(rows.filter((b: BookingRow) => !isTaskComplete(b)).map((b: BookingRow) => b.id)));
+      setPendingSnapshotIds(
+        new Set(
+          rows
+            .filter((b: BookingRow) => !(isAdminTasksComplete(b) && b.inv_exp_done))
+            .map((b: BookingRow) => b.id)
+        )
+      );
     } catch (error) {
       toast.error('Failed to fetch bookings');
     } finally {
@@ -259,6 +278,10 @@ export default function TodoPage() {
     updateBooking(booking.id, updates);
   };
 
+  const handleInvExpToggle = (booking: BookingRow) => {
+    updateBooking(booking.id, { inv_exp_done: !booking.inv_exp_done });
+  };
+
   const handleDateChange = (
     id: string,
     dateField: 'platform_invoice_date' | 'final_liquidation_date',
@@ -318,6 +341,33 @@ export default function TodoPage() {
         </p>
       </div>
 
+      {/* Workflow legend */}
+      <div className="card overflow-x-auto">
+        <div className="flex min-w-[560px]">
+          {WORKFLOW_PHASES.map((phase, idx) => {
+            const isFirst = idx === 0;
+            const isLast = idx === WORKFLOW_PHASES.length - 1;
+            return (
+              <div
+                key={phase}
+                className="flex-1 flex items-center justify-center text-white text-[11px] sm:text-xs font-bold uppercase tracking-wide py-3 text-center px-3"
+                style={{
+                  backgroundColor: WORKFLOW_COLORS[idx],
+                  marginLeft: isFirst ? 0 : -18,
+                  clipPath: isFirst
+                    ? 'polygon(0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%)'
+                    : isLast
+                    ? 'polygon(18px 50%, 0 0, 100% 0, 100% 100%, 0 100%)'
+                    : 'polygon(18px 50%, 0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%)',
+                }}
+              >
+                {phase}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Filter line */}
       <div className="card">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -349,7 +399,8 @@ export default function TodoPage() {
             <option value="CONFIRMED">Confirmed</option>
             <option value="PENDING CONFIRMATION">Pending Confirmation</option>
             <option value="CHECKED IN">Checked In</option>
-            <option value="CHECKED OUT">Checked Out</option>
+            <option value="CHECK OUT">Check Out</option>
+            <option value="TO INV/EXP">To Inv/Exp</option>
             <option value="COMPLETED">Completed</option>
           </select>
           <select
@@ -381,7 +432,7 @@ export default function TodoPage() {
             }
             className="select"
           >
-            <option value="">Final Liquidation: All</option>
+            <option value="">Owner Liquidation: All</option>
             <option value="TO BE DONE">To Be Done</option>
             <option value="SENT">Sent</option>
             <option value="NA">N/A</option>
@@ -412,13 +463,14 @@ export default function TodoPage() {
                 <SortableHeader column="todo_status">To Do Status</SortableHeader>
                 <SortableHeader column="police_registration">Police Registration</SortableHeader>
                 <SortableHeader column="platform_invoice">Platform Invoice</SortableHeader>
-                <SortableHeader column="final_liquidation">Final Liquidation</SortableHeader>
+                <SortableHeader column="final_liquidation">Owner Liquidation</SortableHeader>
+                <th>Inv &amp; Exp</th>
               </tr>
             </thead>
             <tbody>
               {sortedBookings.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-8 text-gray-500">
+                  <td colSpan={9} className="text-center py-8 text-gray-500">
                     {showCompleted
                       ? 'No bookings found'
                       : 'No pending tasks — everything is up to date'}
@@ -532,6 +584,26 @@ export default function TodoPage() {
                             )
                           }
                         />
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          onClick={() => handleInvExpToggle(b)}
+                          title={`Inv & Exp ${b.inv_exp_done ? 'done' : 'pending'} — click to change`}
+                          className="inline-flex items-center justify-center"
+                        >
+                          <span
+                            className={`w-6 h-6 rounded border-2 flex items-center justify-center transition ${
+                              b.inv_exp_done
+                                ? 'bg-green-500 border-green-500'
+                                : 'bg-white border-gray-300 hover:border-gray-400'
+                            }`}
+                          >
+                            {b.inv_exp_done && (
+                              <Check size={16} className="text-white" strokeWidth={3} />
+                            )}
+                          </span>
+                        </button>
                       </td>
                     </tr>
                   );

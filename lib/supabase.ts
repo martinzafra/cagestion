@@ -55,6 +55,7 @@ export type Database = {
           platform_invoice_date: string | null;
           final_liquidation: 'TO BE DONE' | 'SENT' | 'NA';
           final_liquidation_date: string | null;
+          inv_exp_done: boolean;
           created_by: string | null;
           created_at: string;
           updated_at: string;
