@@ -48,6 +48,19 @@ const todayISO = () => new Date().toISOString().split('T')[0];
 // chevron strip at the top of the page.
 const WORKFLOW_PHASES = ['CONFIRMED', 'CHECKED IN', 'CHECK OUT', 'TO INV/EXP', 'COMPLETED'];
 const WORKFLOW_COLORS = ['#E0A526', '#E2791C', '#C93B8F', '#7A4FA8', '#4A5FBD'];
+// Same colors as the workflow banner, keyed by phase, so the "To Do Status"
+// badge in the grid matches the step it's on. Statuses outside the workflow
+// (Pending Confirmation) fall back to StatusBadge's own default palette.
+const TODO_STATUS_COLOR: Record<string, string> = Object.fromEntries(
+  WORKFLOW_PHASES.map((phase, idx) => [phase, WORKFLOW_COLORS[idx]])
+);
+
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 // A booking's admin tasks are done once each is either completed or marked
 // not applicable - nothing left in a "to be done" state. This is what moves
@@ -489,7 +502,16 @@ export default function TodoPage() {
                       <td className="whitespace-nowrap">{formatDate(b.check_in_date)}</td>
                       <td className="whitespace-nowrap">{formatDate(b.check_out_date)}</td>
                       <td>
-                        <StatusBadge status={todoStatus} />
+                        {TODO_STATUS_COLOR[todoStatus] ? (
+                          <span
+                            className="px-2.5 py-1 rounded-full text-sm font-medium text-white whitespace-nowrap"
+                            style={{ backgroundColor: hexToRgba(TODO_STATUS_COLOR[todoStatus], 0.8) }}
+                          >
+                            {todoStatus}
+                          </span>
+                        ) : (
+                          <StatusBadge status={todoStatus} />
+                        )}
                       </td>
                       <td>
                         <div className="flex gap-1.5 items-center">
