@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getApartmentColorMap } from '@/lib/apartmentColors';
+import Switch from './Switch';
 
 interface BookingCalendarProps {
   bookings: any[];
@@ -25,20 +26,63 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({
   selectedApartmentIds,
 }) => {
   const [baseMonth, setBaseMonth] = useState(new Date());
+  const [turnoversOnly, setTurnoversOnly] = useState(false);
   const todayKey = toDateKey(new Date());
 
   const colorMap = getApartmentColorMap(apartments);
+  const apartmentOrder = new Map(apartments.map((a, idx) => [a.id, idx]));
 
-  const getBookingsForDate = (date: Date) => {
+  type BarSegment = { type: 'bar'; booking: any; role: 'start' | 'mid' | 'end' | 'single' };
+  type SplitSegment = { type: 'split'; outBooking: any; inBooking: any };
+
+  // Bookings show through their checkout day (inclusive), so a stay reads
+  // as one continuous bar from check-in to check-out rather than vanishing
+  // the day before it ends. When the same apartment has one booking ending
+  // and another starting on the same day, that day is split in half so the
+  // turnover is visible instead of one booking silently overwriting the other.
+  const getSegmentsForDate = (date: Date): (BarSegment | SplitSegment)[] => {
     const dateKey = toDateKey(date);
-    return bookings.filter((b) => {
+    const active = bookings.filter((b) => {
       // Inactive apartments have no filter chip to toggle, so their
       // bookings always show rather than silently disappearing.
       const apt = apartments.find((a: any) => a.id === b.apartment_id);
       const isActive = apt ? (apt as any).active !== false : true;
       if (isActive && !selectedApartmentIds.includes(b.apartment_id)) return false;
       if (b.status === 'CANCELLED') return false;
-      return dateKey >= b.check_in_date && dateKey < b.check_out_date;
+      return dateKey >= b.check_in_date && dateKey <= b.check_out_date;
+    });
+
+    const byApartment = new Map<string, any[]>();
+    active.forEach((b) => {
+      const list = byApartment.get(b.apartment_id) || [];
+      list.push(b);
+      byApartment.set(b.apartment_id, list);
+    });
+
+    const segments: (BarSegment | SplitSegment)[] = [];
+    byApartment.forEach((list, apartmentId) => {
+      const outBooking = list.find((b) => b.check_out_date === dateKey && b.check_in_date !== dateKey);
+      const inBooking = list.find((b) => b.check_in_date === dateKey && b.check_out_date !== dateKey);
+      if (list.length === 2 && outBooking && inBooking) {
+        segments.push({ type: 'split', outBooking, inBooking });
+        return;
+      }
+      list.forEach((b) => {
+        const isStart = b.check_in_date === dateKey;
+        const isEnd = b.check_out_date === dateKey;
+        const role = isStart && isEnd ? 'single' : isStart ? 'start' : isEnd ? 'end' : 'mid';
+        segments.push({ type: 'bar', booking: b, role });
+      });
+    });
+
+    const visible = turnoversOnly
+      ? segments.filter((seg) => seg.type === 'split' || seg.role !== 'mid')
+      : segments;
+
+    return visible.sort((a, b) => {
+      const aptA = a.type === 'split' ? a.outBooking.apartment_id : a.booking.apartment_id;
+      const aptB = b.type === 'split' ? b.outBooking.apartment_id : b.booking.apartment_id;
+      return (apartmentOrder.get(aptA) ?? 0) - (apartmentOrder.get(aptB) ?? 0);
     });
   };
 
@@ -83,7 +127,7 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({
         </div>
         <div className="grid grid-cols-7 gap-px bg-gray-200 p-px">
           {days.map((date, idx) => {
-            const dayBookings = date ? getBookingsForDate(date) : [];
+            const segments = date ? getSegmentsForDate(date) : [];
             const isToday = date && toDateKey(date) === todayKey;
 
             return (
@@ -105,15 +149,52 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({
                       {date.getDate()}
                     </div>
                     <div className="space-y-0.5">
-                      {dayBookings.map((b) => {
+                      {segments.map((seg) => {
+                        if (seg.type === 'split') {
+                          const outColor = colorMap.get(seg.outBooking.apartment_id);
+                          const inColor = colorMap.get(seg.inBooking.apartment_id);
+                          return (
+                            <div
+                              key={`${seg.outBooking.id}-${seg.inBooking.id}`}
+                              className="flex h-[15px] -mx-1"
+                            >
+                              <div
+                                title={`Check-out: ${seg.outBooking.apartment?.name || ''} - ${seg.outBooking.guest_name}`}
+                                className={`flex-1 min-w-0 text-[9px] font-semibold leading-[15px] text-right pr-1.5 truncate border-t-[1.5px] border-b-[1.5px] border-r-[1.5px] rounded-r mr-px ${
+                                  outColor?.chip || 'bg-gray-100 text-gray-800'
+                                } ${outColor?.border || 'border-gray-400'}`}
+                              >
+                                {seg.outBooking.guest_name}
+                              </div>
+                              <div
+                                title={`Check-in: ${seg.inBooking.apartment?.name || ''} - ${seg.inBooking.guest_name}`}
+                                className={`flex-1 min-w-0 text-[9px] font-semibold leading-[15px] text-left pl-1.5 truncate border-t-[1.5px] border-b-[1.5px] border-l-[1.5px] rounded-l ml-px ${
+                                  inColor?.chip || 'bg-gray-100 text-gray-800'
+                                } ${inColor?.border || 'border-gray-400'}`}
+                              >
+                                {seg.inBooking.guest_name}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        const { booking: b, role } = seg;
                         const color = colorMap.get(b.apartment_id);
+                        const roleClasses =
+                          role === 'start'
+                            ? 'border-l-[1.5px] rounded-l pl-1.5'
+                            : role === 'end'
+                            ? 'border-r-[1.5px] rounded-r pr-1.5'
+                            : role === 'single'
+                            ? 'border-l-[1.5px] border-r-[1.5px] rounded px-1.5'
+                            : 'px-0.5';
                         return (
                           <div
                             key={b.id}
                             title={`${b.apartment?.name || ''} - ${b.guest_name}`}
-                            className={`text-[10px] leading-tight rounded px-1 py-0.5 truncate ${
+                            className={`text-[9px] font-semibold leading-[15px] truncate -mx-1 border-t-[1.5px] border-b-[1.5px] ${roleClasses} ${
                               color?.chip || 'bg-gray-100 text-gray-800'
-                            }`}
+                            } ${color?.border || 'border-gray-400'}`}
                           >
                             {b.apartment?.name || ''} - {b.guest_name}
                           </div>
@@ -137,7 +218,15 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({
   return (
     <div className="space-y-4">
       {/* Navigation */}
-      <div className="flex justify-end items-center gap-2">
+      <div className="flex justify-between items-center gap-2 flex-wrap">
+        <Switch
+          checked={turnoversOnly}
+          onChange={setTurnoversOnly}
+          className="flex items-center gap-2.5 text-sm text-gray-800 whitespace-nowrap"
+        >
+          Check-ins/Check-outs only
+        </Switch>
+        <div className="flex items-center gap-2">
         <button
           onClick={() =>
             setBaseMonth(new Date(baseMonth.getFullYear(), baseMonth.getMonth() - 1))
@@ -160,6 +249,7 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({
         >
           <ChevronRight size={20} />
         </button>
+        </div>
       </div>
 
       {/* Legend */}

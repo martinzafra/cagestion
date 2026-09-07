@@ -6,7 +6,9 @@ import toast from 'react-hot-toast';
 import StatusBadge from '@/components/StatusBadge';
 import StatusSquare from '@/components/StatusSquare';
 import { formatDate } from '@/lib/calculations';
-import { ChevronUp, ChevronDown, Plus, Image as ImageIcon } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, Image as ImageIcon, X } from 'lucide-react';
+import Switch from '@/components/Switch';
+import { fetchAllowedApartments } from '@/lib/apartmentAccess';
 
 type TaskStatus = 'TO BE DONE' | 'DONE' | 'NA';
 type InvoiceStatus = 'TO BE DONE' | 'SENT' | 'NA';
@@ -126,13 +128,8 @@ export default function TodoPage() {
 
   const fetchApartments = async () => {
     try {
-      const { data, error } = await supabase
-        .from('inventory_apartments')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
-      setApartments(data || []);
+      const data = await fetchAllowedApartments();
+      setApartments(data);
     } catch (error) {
       toast.error('Failed to fetch apartments');
     }
@@ -294,6 +291,20 @@ export default function TodoPage() {
     }
   };
 
+  const handleDeletePoliceFile = async (booking: BookingRow) => {
+    if (!booking.police_registration_file) return;
+    if (!confirm('Remove this photo?')) return;
+    try {
+      await supabase.storage
+        .from('police-registrations')
+        .remove([booking.police_registration_file]);
+      await updateBooking(booking.id, { police_registration_file: null });
+      toast.success('Photo removed');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to remove photo');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -303,14 +314,13 @@ export default function TodoPage() {
             Track booking status and pending administrative tasks
           </p>
         </div>
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showCompleted}
-            onChange={(e) => setShowCompleted(e.target.checked)}
-          />
-          Show completed bookings
-        </label>
+        <Switch
+          checked={showCompleted}
+          onChange={setShowCompleted}
+          className="flex items-center gap-2.5 text-sm text-gray-800"
+        >
+          Show also COMPLETED bookings
+        </Switch>
       </div>
 
       {/* Filter line */}
@@ -448,14 +458,24 @@ export default function TodoPage() {
                             }
                           />
                           {b.police_registration_file ? (
-                            <button
-                              type="button"
-                              onClick={() => handleViewPoliceFile(b.police_registration_file!)}
-                              title="View attached photo"
-                              className="p-1 hover:bg-gray-200 rounded"
-                            >
-                              <ImageIcon size={14} className="text-gray-600" />
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleViewPoliceFile(b.police_registration_file!)}
+                                title="View attached photo"
+                                className="p-1 hover:bg-gray-200 rounded"
+                              >
+                                <ImageIcon size={14} className="text-gray-600" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePoliceFile(b)}
+                                title="Remove photo"
+                                className="p-1 hover:bg-red-100 rounded"
+                              >
+                                <X size={14} className="text-red-500" />
+                              </button>
+                            </>
                           ) : (
                             <button
                               type="button"

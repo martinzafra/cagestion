@@ -6,7 +6,10 @@ import { Plus, Calendar, List } from 'lucide-react';
 import BookingForm from '@/components/BookingForm';
 import BookingsList from '@/components/BookingsList';
 import BookingCalendar from '@/components/BookingCalendar';
+import ApartmentChipFilter from '@/components/ApartmentChipFilter';
+import Switch from '@/components/Switch';
 import { getApartmentColorMap } from '@/lib/apartmentColors';
+import { fetchAllowedApartments } from '@/lib/apartmentAccess';
 import toast from 'react-hot-toast';
 
 type ViewMode = 'list' | 'calendar';
@@ -18,13 +21,11 @@ export default function BookingsPage() {
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [apartments, setApartments] = useState<any[]>([]);
-  const [agents, setAgents] = useState<any[]>([]);
   const [calendarApartmentIds, setCalendarApartmentIds] = useState<string[]>([]);
   const [showFinished, setShowFinished] = useState(false);
 
   const [listFilters, setListFilters] = useState({
     apartment_id: '',
-    agent_id: '',
     status: '',
     search: '',
     dateFrom: '',
@@ -34,7 +35,6 @@ export default function BookingsPage() {
   useEffect(() => {
     fetchBookings();
     fetchApartments();
-    fetchAgents();
   }, []);
 
   const fetchBookings = async () => {
@@ -62,34 +62,15 @@ export default function BookingsPage() {
 
   const fetchApartments = async () => {
     try {
-      const { data, error } = await supabase
-        .from('inventory_apartments')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
-      setApartments(data || []);
+      const data = await fetchAllowedApartments();
+      setApartments(data);
       setCalendarApartmentIds((prev) =>
         prev.length === 0
-          ? (data || []).filter((a) => a.active !== false).map((a) => a.id)
+          ? data.filter((a) => a.active !== false).map((a) => a.id)
           : prev
       );
     } catch (error) {
       toast.error('Failed to fetch apartments');
-    }
-  };
-
-  const fetchAgents = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('inventory_agents')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
-      setAgents(data || []);
-    } catch (error) {
-      toast.error('Failed to fetch agents');
     }
   };
 
@@ -120,7 +101,6 @@ export default function BookingsPage() {
     if (!showFinished && b.status === 'FINISHED') return false;
     if (listFilters.apartment_id && b.apartment_id !== listFilters.apartment_id)
       return false;
-    if (listFilters.agent_id && b.agent_id !== listFilters.agent_id) return false;
     if (listFilters.status && b.status !== listFilters.status) return false;
     if (listFilters.dateFrom && b.check_in_date < listFilters.dateFrom) return false;
     if (listFilters.dateTo && b.check_in_date > listFilters.dateTo) return false;
@@ -216,20 +196,6 @@ export default function BookingsPage() {
                 ))}
               </select>
               <select
-                value={listFilters.agent_id}
-                onChange={(e) =>
-                  setListFilters({ ...listFilters, agent_id: e.target.value })
-                }
-                className="select"
-              >
-                <option value="">All Agents</option>
-                {agents.map((agent) => (
-                  <option key={agent.id} value={agent.id}>
-                    {agent.name}
-                  </option>
-                ))}
-              </select>
-              <select
                 value={listFilters.status}
                 onChange={(e) =>
                   setListFilters({ ...listFilters, status: e.target.value })
@@ -269,14 +235,13 @@ export default function BookingsPage() {
                 }
                 className="input"
               />
-              <label className="col-span-full flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
-                <input
-                  type="checkbox"
-                  checked={showFinished}
-                  onChange={(e) => setShowFinished(e.target.checked)}
-                />
-                Show FINISHED Bookings
-              </label>
+              <Switch
+                checked={showFinished}
+                onChange={setShowFinished}
+                className="col-span-full flex items-center gap-2.5 text-sm text-gray-800 whitespace-nowrap"
+              >
+                Show also FINISHED bookings
+              </Switch>
             </div>
           </div>
           <BookingsList
@@ -289,26 +254,12 @@ export default function BookingsPage() {
         <div className="card">
           <div className="mb-4">
             <label className="label">Filter by Apartment</label>
-            <div className="flex flex-wrap gap-2">
-              {activeApartments.map((apt) => {
-                const checked = calendarApartmentIds.includes(apt.id);
-                return (
-                  <label
-                    key={apt.id}
-                    className={`flex items-center gap-1.5 text-sm cursor-pointer px-2 py-1 rounded ${
-                      checked ? colorMap.get(apt.id)?.chip || 'bg-gray-100' : 'bg-gray-50 opacity-60'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleCalendarApartment(apt.id)}
-                    />
-                    {apt.name}
-                  </label>
-                );
-              })}
-            </div>
+            <ApartmentChipFilter
+              apartments={activeApartments}
+              selectedIds={calendarApartmentIds}
+              onToggle={toggleCalendarApartment}
+              colorMap={colorMap}
+            />
           </div>
           <BookingCalendar
             bookings={bookings}

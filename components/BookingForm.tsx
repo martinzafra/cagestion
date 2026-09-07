@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { calculateNights } from '@/lib/calculations';
 import toast from 'react-hot-toast';
+import Switch from './Switch';
 
 interface BookingFormProps {
   bookingId?: string;
@@ -568,19 +569,12 @@ const BookingForm: React.FC<BookingFormProps> = ({
       </div>
 
       {/* Owners booking flag */}
-      <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          id="owners_booking"
-          name="owners_booking"
-          checked={formData.owners_booking}
-          onChange={handleChange}
-          className="h-4 w-4"
-        />
-        <label htmlFor="owners_booking" className="label mb-0">
-          Owners booking (Non chargeable)
-        </label>
-      </div>
+      <Switch
+        checked={formData.owners_booking}
+        onChange={(checked) => setFormData((prev) => ({ ...prev, owners_booking: checked }))}
+      >
+        <span className="label mb-0">Owners booking (Non chargeable)</span>
+      </Switch>
 
       {/* Pricing Mode Toggle */}
       {!formData.owners_booking && (

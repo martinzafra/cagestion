@@ -6,6 +6,9 @@ import { Plus, Trash2, Pencil, Download, ChevronUp, ChevronDown } from 'lucide-r
 import toast from 'react-hot-toast';
 import { formatDate, formatCurrency } from '@/lib/calculations';
 import { getApartmentColorMap } from '@/lib/apartmentColors';
+import { fetchAllowedApartments } from '@/lib/apartmentAccess';
+import ApartmentChipFilter from '@/components/ApartmentChipFilter';
+import Switch from '@/components/Switch';
 
 type SortColumn =
   | 'revenue_type'
@@ -62,7 +65,7 @@ export default function RevenuePage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [revenueRes, aptRes, bookingsRes, itemsRes] = await Promise.all([
+      const [revenueRes, allowedApartments, bookingsRes, itemsRes] = await Promise.all([
         supabase
           .from('revenue_invoicing')
           .select(`
@@ -72,7 +75,7 @@ export default function RevenuePage() {
             item:inventory_invoice_items(name)
           `)
           .order('revenue_date', { ascending: false }),
-        supabase.from('inventory_apartments').select('*').order('name'),
+        fetchAllowedApartments(),
         supabase
           .from('bookings')
           .select('id, guest_name, check_in_date, booking_ref')
@@ -81,14 +84,12 @@ export default function RevenuePage() {
       ]);
 
       if (revenueRes.data) setRevenues(revenueRes.data);
-      if (aptRes.data) {
-        setApartments(aptRes.data);
-        setApartmentFilterIds((prev) =>
-          prev.size === 0
-            ? new Set(aptRes.data.filter((a: any) => a.active !== false).map((a: any) => a.id))
-            : prev
-        );
-      }
+      setApartments(allowedApartments);
+      setApartmentFilterIds((prev) =>
+        prev.size === 0
+          ? new Set(allowedApartments.filter((a: any) => a.active !== false).map((a: any) => a.id))
+          : prev
+      );
       if (bookingsRes.data) setBookings(bookingsRes.data);
       if (itemsRes.data) setInvoiceItems(itemsRes.data);
     } catch (error) {
@@ -445,17 +446,12 @@ export default function RevenuePage() {
             </div>
 
             <div>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formData.issued}
-                  onChange={(e) =>
-                    setFormData({ ...formData, issued: e.target.checked })
-                  }
-                  className="w-4 h-4"
-                />
+              <Switch
+                checked={formData.issued}
+                onChange={(checked) => setFormData({ ...formData, issued: checked })}
+              >
                 <span className="text-sm font-medium text-gray-700">Issued</span>
-              </label>
+              </Switch>
             </div>
 
             <div className="flex gap-3">
@@ -490,26 +486,12 @@ export default function RevenuePage() {
           <div className="card">
             <div className="mb-3">
               <label className="text-xs text-gray-500 block mb-1.5">Apartment</label>
-              <div className="flex flex-wrap gap-2">
-                {activeApartments.map((apt) => {
-                  const checked = apartmentFilterIds.has(apt.id);
-                  return (
-                    <label
-                      key={apt.id}
-                      className={`flex items-center gap-1.5 text-sm cursor-pointer px-2 py-1 rounded ${
-                        checked ? apartmentColorMap.get(apt.id)?.chip || 'bg-gray-100' : 'bg-gray-50 opacity-60'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleApartmentFilter(apt.id)}
-                      />
-                      {apt.name}
-                    </label>
-                  );
-                })}
-              </div>
+              <ApartmentChipFilter
+                apartments={activeApartments}
+                selectedIds={apartmentFilterIds}
+                onToggle={toggleApartmentFilter}
+                colorMap={apartmentColorMap}
+              />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               <select

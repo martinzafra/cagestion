@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, Trash2, Lock, Pencil, Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Switch from '@/components/Switch';
+import ToggleChip from '@/components/ToggleChip';
 
 type InventoryType = 'agents' | 'apartments' | 'platforms' | 'expense_types' | 'invoice_items' | 'payment_types';
 
@@ -387,14 +389,13 @@ export default function InventoryPage() {
             Add {tabLabels[activeTab]}
           </button>
           {activeTab === 'apartments' && (
-            <label className="flex items-center gap-2 text-sm cursor-pointer text-gray-700">
-              <input
-                type="checkbox"
-                checked={showInactive}
-                onChange={(e) => setShowInactive(e.target.checked)}
-              />
-              Show Properties Not Active
-            </label>
+            <Switch
+              checked={showInactive}
+              onChange={setShowInactive}
+              className="flex items-center gap-2.5 text-sm text-gray-800"
+            >
+              Show also NOT ACTIVE properties
+            </Switch>
           )}
         </div>
       )}
@@ -446,17 +447,16 @@ export default function InventoryPage() {
                     <div className="flex items-center gap-3">
                       <span className="font-medium">{item.name}</span>
                       {activeTab === 'apartments' && (
-                        <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={item.active !== false}
-                            onChange={(e) => {
-                              handleApartmentFieldChange(item.id, 'active', e.target.checked);
-                              persistApartmentField(item.id, 'active', e.target.checked);
-                            }}
-                          />
+                        <Switch
+                          checked={item.active !== false}
+                          onChange={(checked) => {
+                            handleApartmentFieldChange(item.id, 'active', checked);
+                            persistApartmentField(item.id, 'active', checked);
+                          }}
+                          className="flex items-center gap-1.5 text-xs text-gray-500"
+                        >
                           Active
-                        </label>
+                        </Switch>
                       )}
                     </div>
                     <div className="flex gap-1">
@@ -540,17 +540,13 @@ export default function InventoryPage() {
                   {allUsers.map((user) => {
                     const enabled = agentUsers.has(`${item.id}:${user.id}`);
                     return (
-                      <label
+                      <ToggleChip
                         key={user.id}
-                        className="flex items-center gap-1.5 text-sm cursor-pointer"
+                        checked={enabled}
+                        onClick={() => toggleAgentUser(item.id, user.id)}
                       >
-                        <input
-                          type="checkbox"
-                          checked={enabled}
-                          onChange={() => toggleAgentUser(item.id, user.id)}
-                        />
                         {user.full_name || user.email}
-                      </label>
+                      </ToggleChip>
                     );
                   })}
                 </div>
@@ -561,17 +557,13 @@ export default function InventoryPage() {
                   {allAgents.map((agent) => {
                     const enabled = agentApartments.has(`${agent.id}:${item.id}`);
                     return (
-                      <label
+                      <ToggleChip
                         key={agent.id}
-                        className="flex items-center gap-1.5 text-sm cursor-pointer"
+                        checked={enabled}
+                        onClick={() => toggleAgentApartment(agent.id, item.id)}
                       >
-                        <input
-                          type="checkbox"
-                          checked={enabled}
-                          onChange={() => toggleAgentApartment(agent.id, item.id)}
-                        />
                         {agent.name}
-                      </label>
+                      </ToggleChip>
                     );
                   })}
                 </div>
