@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { formatDate, formatCurrency } from '@/lib/calculations';
 import { getApartmentColorMap } from '@/lib/apartmentColors';
 import { fetchAllowedApartments } from '@/lib/apartmentAccess';
+import { compareSortValues } from '@/lib/sort';
 import ApartmentChipFilter from '@/components/ApartmentChipFilter';
 import Switch from '@/components/Switch';
 
@@ -259,11 +260,8 @@ export default function RevenuePage() {
 
   const sortedRevenues = sortColumn
     ? [...filteredRevenues].sort((a, b) => {
-        const va = getSortValue(a, sortColumn);
-        const vb = getSortValue(b, sortColumn);
-        if (va < vb) return sortDirection === 'asc' ? -1 : 1;
-        if (va > vb) return sortDirection === 'asc' ? 1 : -1;
-        return 0;
+        const cmp = compareSortValues(getSortValue(a, sortColumn), getSortValue(b, sortColumn));
+        return sortDirection === 'asc' ? cmp : -cmp;
       })
     : filteredRevenues;
 

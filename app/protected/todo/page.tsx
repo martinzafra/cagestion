@@ -9,6 +9,7 @@ import { formatDate } from '@/lib/calculations';
 import { ChevronUp, ChevronDown, Plus, Image as ImageIcon, X } from 'lucide-react';
 import Switch from '@/components/Switch';
 import { fetchAllowedApartments } from '@/lib/apartmentAccess';
+import { compareSortValues } from '@/lib/sort';
 
 type TaskStatus = 'TO BE DONE' | 'DONE' | 'NA';
 type InvoiceStatus = 'TO BE DONE' | 'SENT' | 'NA';
@@ -194,11 +195,8 @@ export default function TodoPage() {
 
   const sortedBookings = sortColumn
     ? [...visibleBookings].sort((a, b) => {
-        const va = getSortValue(a, sortColumn);
-        const vb = getSortValue(b, sortColumn);
-        if (va < vb) return sortDirection === 'asc' ? -1 : 1;
-        if (va > vb) return sortDirection === 'asc' ? 1 : -1;
-        return 0;
+        const cmp = compareSortValues(getSortValue(a, sortColumn), getSortValue(b, sortColumn));
+        return sortDirection === 'asc' ? cmp : -cmp;
       })
     : visibleBookings;
 
