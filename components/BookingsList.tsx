@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { formatDate, formatCurrency } from '@/lib/calculations';
+import { formatDate } from '@/lib/calculations';
 import { Edit2, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
@@ -17,10 +17,10 @@ type SortColumn =
   | 'apartment'
   | 'agent'
   | 'guest_name'
+  | 'platform'
   | 'check_in_date'
   | 'check_out_date'
   | 'nights'
-  | 'guest_total_amount'
   | 'status';
 
 // Fixed initials per agent, not a generic first-letters transform — these
@@ -35,6 +35,22 @@ const AGENT_BADGE_TEXT: Record<string, string> = {
 function getAgentBadgeText(agentName?: string): string {
   if (!agentName) return '—';
   return AGENT_BADGE_TEXT[agentName] || agentName.slice(0, 2).toUpperCase();
+}
+
+// Fixed initials + brand color per platform, not a generic transform.
+const PLATFORM_BADGE: Record<string, { text: string; className: string }> = {
+  Bookings: { text: 'Bo', className: 'bg-blue-500' },
+  Airbnb: { text: 'Ai', className: 'bg-red-500' },
+  Idealista: { text: 'id', className: 'bg-green-500' },
+  Vrvo: { text: 'Vr', className: 'bg-teal-500' },
+  Clara: { text: 'C', className: 'bg-orange-500' },
+  Owners: { text: 'Ow', className: 'bg-gray-500' },
+  Organic: { text: 'Or', className: 'bg-brown-500' },
+};
+
+function getPlatformBadge(platformName?: string): { text: string; className: string } {
+  if (!platformName) return { text: '—', className: 'bg-gray-400' };
+  return PLATFORM_BADGE[platformName] || { text: platformName.slice(0, 2), className: 'bg-gray-400' };
 }
 
 const GUEST_NAME_MAX_LENGTH = 20;
@@ -84,14 +100,14 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
         return booking.apartment?.name?.toLowerCase() || '';
       case 'agent':
         return booking.agent?.name?.toLowerCase() || '';
+      case 'platform':
+        return booking.platform?.name?.toLowerCase() || '';
       case 'check_in_date':
         return booking.check_in_date || '';
       case 'check_out_date':
         return booking.check_out_date || '';
       case 'nights':
         return booking.nights || 0;
-      case 'guest_total_amount':
-        return booking.guest_total_amount || 0;
       case 'status':
         return booking.status || '';
       default:
@@ -138,10 +154,10 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
             <SortableHeader column="apartment">Apartment</SortableHeader>
             <SortableHeader column="agent">Agent</SortableHeader>
             <SortableHeader column="guest_name">Guest/Booking Ref</SortableHeader>
+            <SortableHeader column="platform" align="center">Platform</SortableHeader>
             <SortableHeader column="check_in_date">Check-in</SortableHeader>
             <SortableHeader column="check_out_date">Check-out</SortableHeader>
             <SortableHeader column="nights">Nights</SortableHeader>
-            <SortableHeader column="guest_total_amount" align="right">Total Amount</SortableHeader>
             <SortableHeader column="status" align="center">Status</SortableHeader>
             <th>Actions</th>
           </tr>
@@ -177,12 +193,22 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
                   </div>
                   <div className="text-gray-400">{booking.booking_ref}</div>
                 </td>
+                <td className="text-center">
+                  {(() => {
+                    const badge = getPlatformBadge(booking.platform?.name);
+                    return (
+                      <span
+                        title={booking.platform?.name || 'No platform'}
+                        className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-xs font-bold ${badge.className}`}
+                      >
+                        {badge.text}
+                      </span>
+                    );
+                  })()}
+                </td>
                 <td>{formatDate(booking.check_in_date)}</td>
                 <td>{formatDate(booking.check_out_date)}</td>
                 <td>{booking.nights}</td>
-                <td className="font-semibold text-right">
-                  {formatCurrency(booking.guest_total_amount || 0)}
-                </td>
                 <td className="text-center">
                   <StatusBadge status={booking.status} wrap />
                 </td>
