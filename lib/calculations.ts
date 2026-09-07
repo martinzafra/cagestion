@@ -55,6 +55,26 @@ export function formatDate(date: Date | string): string {
   return `${day}/${month}/${year}`;
 }
 
+const MONTH_ABBR = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+// Compact range for a stay: "1-20 Jul" when both dates fall in the same
+// month/year, "1Jul-20Aug" when they don't - used where a booking's dates
+// need to fit inline next to its guest name (e.g. a picker list).
+export function formatBookingDateRange(checkInDate: string, checkOutDate: string): string {
+  const [inYear, inMonth, inDay] = checkInDate.split('-').map(Number);
+  const [outYear, outMonth, outDay] = checkOutDate.split('-').map(Number);
+  const inAbbr = MONTH_ABBR[inMonth - 1];
+  const outAbbr = MONTH_ABBR[outMonth - 1];
+
+  if (inYear === outYear && inMonth === outMonth) {
+    return `${inDay}-${outDay} ${inAbbr}`;
+  }
+  return `${inDay}${inAbbr}-${outDay}${outAbbr}`;
+}
+
 export function formatDateISO(date: Date | string): string {
   if (typeof date === 'string') {
     return date;

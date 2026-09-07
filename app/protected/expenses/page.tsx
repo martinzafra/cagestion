@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, Trash2, Pencil, Paperclip, X, ChevronUp, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { formatDate, formatCurrency } from '@/lib/calculations';
+import { formatDate, formatCurrency, formatBookingDateRange } from '@/lib/calculations';
 import { getApartmentColorMap } from '@/lib/apartmentColors';
 import { fetchAllowedApartments } from '@/lib/apartmentAccess';
 import { compareSortValues } from '@/lib/sort';
@@ -80,7 +80,7 @@ export default function ExpensesPage() {
         supabase.from('inventory_expense_types').select('*').order('name'),
         supabase
           .from('bookings')
-          .select('id, guest_name, check_in_date')
+          .select('id, guest_name, booking_ref, check_in_date, check_out_date')
           .order('check_in_date', { ascending: false }),
       ]);
 
@@ -509,7 +509,7 @@ export default function ExpensesPage() {
                   <option value="">General Expense</option>
                   {bookings.map((b) => (
                     <option key={b.id} value={b.id}>
-                      {b.guest_name}
+                      {b.guest_name}, {b.booking_ref}, {formatBookingDateRange(b.check_in_date, b.check_out_date)}
                     </option>
                   ))}
                 </select>
