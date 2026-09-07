@@ -3,7 +3,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
-import StatusBadge from '@/components/StatusBadge';
 import StatusSquare from '@/components/StatusSquare';
 import { formatDate } from '@/lib/calculations';
 import { ChevronUp, ChevronDown, Plus, Image as ImageIcon, X, Check } from 'lucide-react';
@@ -45,30 +44,21 @@ interface BookingRow {
 const todayISO = () => new Date().toISOString().split('T')[0];
 
 // The ordered workflow this page walks a booking through - shown as the
-// chevron strip at the top of the page. Pending/Confirmed use the same pale
-// two-tone colors as their badges on the Bookings screen; the later phases
-// get their own solid color with white text.
+// chevron strip at the top of the page. Every phase uses the same pale
+// bg / dark-text-of-the-same-hue style as Pending/Confirmed's badges on
+// the Bookings screen.
 const WORKFLOW_PHASES: { key: string; label: string; bg: string; text: string }[] = [
   { key: 'PENDING CONFIRMATION', label: 'PENDING', bg: '#FEF9C3', text: '#854D0E' },
   { key: 'CONFIRMED', label: 'CONFIRMED', bg: '#DCFCE7', text: '#166534' },
-  { key: 'CHECK IN', label: 'CHECK IN', bg: '#14B8A6', text: '#FFFFFF' },
-  { key: 'CHECK OUT', label: 'CHECK OUT', bg: '#38BDF8', text: '#FFFFFF' },
-  { key: 'TO INV/EXP', label: 'TO INV/EXP', bg: '#582294', text: '#FFFFFF' },
-  { key: 'COMPLETED', label: 'COMPLETED', bg: '#CD27A4', text: '#FFFFFF' },
+  { key: 'CHECK IN', label: 'CHECK IN', bg: '#CCFBF1', text: '#115E59' },
+  { key: 'CHECK OUT', label: 'CHECK OUT', bg: '#E0F2FE', text: '#075985' },
+  { key: 'TO INV/EXP', label: 'TO INV/EXP', bg: '#EEE9F4', text: '#582294' },
+  { key: 'COMPLETED', label: 'COMPLETED', bg: '#FAE6F5', text: '#7A1763' },
 ];
-// The solid-color phases only, keyed for the grid's "To Do Status" badge and
-// row tint. Pending/Confirmed aren't included here - they already render
-// correctly via StatusBadge's own palette, which matches Bookings exactly.
-const SOLID_PHASE_COLOR: Record<string, string> = Object.fromEntries(
-  WORKFLOW_PHASES.filter((p) => p.text === '#FFFFFF').map((p) => [p.key, p.bg])
+// Keyed lookup for the grid's "To Do Status" badge and row tint.
+const PHASE_STYLE: Record<string, { bg: string; text: string }> = Object.fromEntries(
+  WORKFLOW_PHASES.map((p) => [p.key, { bg: p.bg, text: p.text }])
 );
-
-function hexToRgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
 
 // A booking's admin tasks are done once each is either completed or marked
 // not applicable - nothing left in a "to be done" state. This is what moves
@@ -96,13 +86,6 @@ function computeTodoStatus(b: BookingRow): string {
   if (today >= b.check_in_date) return 'CHECK IN';
   return b.status;
 }
-
-// Row tint for the pale (Pending/Confirmed) phases only - the solid phases
-// get their row tint computed inline from SOLID_PHASE_COLOR instead.
-const ROW_TINT: Record<string, string> = {
-  CONFIRMED: 'bg-green-50',
-  'PENDING CONFIRMATION': 'bg-yellow-50',
-};
 
 export default function TodoPage() {
   const [bookings, setBookings] = useState<BookingRow[]>([]);
@@ -515,12 +498,11 @@ export default function TodoPage() {
               ) : (
                 sortedBookings.map((b) => {
                   const todoStatus = computeTodoStatus(b);
-                  const workflowColor = SOLID_PHASE_COLOR[todoStatus];
+                  const phaseStyle = PHASE_STYLE[todoStatus];
                   return (
                     <tr
                       key={b.id}
-                      className={workflowColor ? '' : ROW_TINT[todoStatus] || ''}
-                      style={workflowColor ? { backgroundColor: hexToRgba(workflowColor, 0.08) } : undefined}
+                      style={phaseStyle ? { backgroundColor: phaseStyle.bg } : undefined}
                     >
                       <td>{b.apartment?.name}</td>
                       <td>
@@ -530,16 +512,16 @@ export default function TodoPage() {
                       <td className="whitespace-nowrap">{formatDate(b.check_in_date)}</td>
                       <td className="whitespace-nowrap">{formatDate(b.check_out_date)}</td>
                       <td>
-                        {workflowColor ? (
-                          <span
-                            className="px-2.5 py-1 rounded-full text-sm font-medium text-white whitespace-nowrap"
-                            style={{ backgroundColor: hexToRgba(workflowColor, 0.55) }}
-                          >
-                            {todoStatus}
-                          </span>
-                        ) : (
-                          <StatusBadge status={todoStatus} />
-                        )}
+                        <span
+                          className="px-2.5 py-1 rounded-full text-sm font-medium whitespace-nowrap"
+                          style={
+                            phaseStyle
+                              ? { backgroundColor: phaseStyle.bg, color: phaseStyle.text }
+                              : undefined
+                          }
+                        >
+                          {todoStatus}
+                        </span>
                       </td>
                       <td>
                         <div className="flex gap-1.5 items-center justify-center">
