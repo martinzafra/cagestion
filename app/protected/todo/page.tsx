@@ -232,15 +232,20 @@ export default function TodoPage() {
       })
     : visibleBookings;
 
-  const SortableHeader: React.FC<{ column: SortColumn; children: React.ReactNode }> = ({
-    column,
-    children,
-  }) => (
+  const SortableHeader: React.FC<{
+    column: SortColumn;
+    children: React.ReactNode;
+    align?: 'left' | 'center';
+  }> = ({ column, children, align = 'left' }) => (
     <th
-      className="cursor-pointer select-none hover:bg-gray-200 max-w-[110px]"
+      className={`cursor-pointer select-none hover:bg-gray-200 ${align === 'center' ? '!text-center' : ''}`}
       onClick={() => handleSort(column)}
     >
-      <span className="inline-flex items-center gap-1 flex-wrap leading-tight">
+      <span
+        className={`inline-flex items-center gap-1 flex-wrap leading-tight ${
+          align === 'center' ? 'justify-center' : ''
+        }`}
+      >
         {children}
         {sortColumn === column &&
           (sortDirection === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
@@ -466,7 +471,18 @@ export default function TodoPage() {
         </div>
       ) : (
         <div className="card overflow-x-auto">
-          <table className="table text-xs [&_th]:text-xs [&_th]:px-2 [&_th]:py-1.5 [&_td]:text-xs [&_td]:px-2 [&_td]:py-1.5">
+          <table className="table [table-layout:fixed] w-full text-xs [&_th]:text-xs [&_th]:px-2 [&_th]:py-1.5 [&_td]:text-xs [&_td]:px-2 [&_td]:py-1.5">
+            <colgroup>
+              <col className="w-[90px]" />
+              <col className="w-[220px]" />
+              <col className="w-[75px]" />
+              <col className="w-[80px]" />
+              <col className="w-[130px]" />
+              <col className="w-[150px]" />
+              <col className="w-[150px]" />
+              <col className="w-[150px]" />
+              <col className="w-[150px]" />
+            </colgroup>
             <thead>
               <tr>
                 <SortableHeader column="apartment">Apartment</SortableHeader>
@@ -474,10 +490,10 @@ export default function TodoPage() {
                 <SortableHeader column="check_in_date">Check-in</SortableHeader>
                 <SortableHeader column="check_out_date">Check-out</SortableHeader>
                 <SortableHeader column="todo_status">To Do Status</SortableHeader>
-                <SortableHeader column="police_registration">Police Registration</SortableHeader>
-                <SortableHeader column="platform_invoice">Platform Invoice</SortableHeader>
-                <SortableHeader column="final_liquidation">Owner Liquidation</SortableHeader>
-                <th>Inv &amp; Exp</th>
+                <SortableHeader column="police_registration" align="center">Police Registration</SortableHeader>
+                <SortableHeader column="platform_invoice" align="center">Platform Invoice</SortableHeader>
+                <SortableHeader column="final_liquidation" align="center">Owner Liquidation</SortableHeader>
+                <th className="!text-center">Inv &amp; Exp</th>
               </tr>
             </thead>
             <tbody>
@@ -492,10 +508,15 @@ export default function TodoPage() {
               ) : (
                 sortedBookings.map((b) => {
                   const todoStatus = computeTodoStatus(b);
+                  const workflowColor = TODO_STATUS_COLOR[todoStatus];
                   return (
-                    <tr key={b.id} className={ROW_TINT[todoStatus] || ''}>
-                      <td className="whitespace-nowrap">{b.apartment?.name}</td>
-                      <td className="whitespace-nowrap">
+                    <tr
+                      key={b.id}
+                      className={workflowColor ? '' : ROW_TINT[todoStatus] || ''}
+                      style={workflowColor ? { backgroundColor: hexToRgba(workflowColor, 0.08) } : undefined}
+                    >
+                      <td>{b.apartment?.name}</td>
+                      <td>
                         <div>{b.guest_name}</div>
                         <div className="text-gray-400">{b.booking_ref}</div>
                       </td>
@@ -505,7 +526,7 @@ export default function TodoPage() {
                         {TODO_STATUS_COLOR[todoStatus] ? (
                           <span
                             className="px-2.5 py-1 rounded-full text-sm font-medium text-white whitespace-nowrap"
-                            style={{ backgroundColor: hexToRgba(TODO_STATUS_COLOR[todoStatus], 0.8) }}
+                            style={{ backgroundColor: hexToRgba(TODO_STATUS_COLOR[todoStatus], 0.55) }}
                           >
                             {todoStatus}
                           </span>
@@ -514,7 +535,7 @@ export default function TodoPage() {
                         )}
                       </td>
                       <td>
-                        <div className="flex gap-1.5 items-center">
+                        <div className="flex gap-1.5 items-center justify-center">
                           <StatusSquare
                             value={b.police_registration}
                             doneValue="DONE"
@@ -565,7 +586,7 @@ export default function TodoPage() {
                         </div>
                       </td>
                       <td>
-                        <div className="flex gap-1.5 items-center">
+                        <div className="flex gap-1.5 items-center justify-center">
                           <StatusSquare
                             value={b.platform_invoice}
                             doneValue="SENT"
@@ -593,7 +614,7 @@ export default function TodoPage() {
                           />
                         </div>
                       </td>
-                      <td>
+                      <td className="text-center">
                         <StatusSquare
                           value={b.final_liquidation}
                           doneValue="SENT"
@@ -607,7 +628,7 @@ export default function TodoPage() {
                           }
                         />
                       </td>
-                      <td>
+                      <td className="text-center">
                         <button
                           type="button"
                           onClick={() => handleInvExpToggle(b)}
