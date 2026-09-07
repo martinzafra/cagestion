@@ -41,7 +41,7 @@ function getAgentBadgeText(agentName?: string): string {
 // Booking.com, Airbnb and Idealista use their real official icon colors
 // (sampled from their app icons); the rest use the app's own palette.
 const PLATFORM_BADGE: Record<string, { text: string; className: string; textClassName?: string }> = {
-  Bookings: { text: 'Bo', className: 'bg-[#003580]' },
+  Bookings: { text: 'B.', className: 'bg-[#003580]' },
   Airbnb: { text: 'Ai', className: 'bg-[#FF5A5F]' },
   Idealista: { text: 'id', className: 'bg-[#D9F563]', textClassName: 'text-black' },
   Vrvo: { text: 'Vr', className: 'bg-teal-500' },
