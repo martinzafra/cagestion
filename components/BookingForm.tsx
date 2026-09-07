@@ -18,7 +18,7 @@ interface FormData {
   agent_id: string;
   apartment_id: string;
   platform_id: string;
-  status: 'CONFIRMED' | 'PENDING CONFIRMATION' | 'CANCELLED' | 'FINISHED';
+  status: 'CONFIRMED' | 'PENDING CONFIRMATION' | 'CANCELLED' | 'DONE' | 'FINISHED';
   guest_name: string;
   guest_phone: string;
   guest_email: string;
@@ -377,6 +377,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
           >
             <option value="CONFIRMED">Confirmed</option>
             <option value="PENDING CONFIRMATION">Pending Confirmation</option>
+            <option value="DONE">Done</option>
             <option value="FINISHED">Finished</option>
             <option value="CANCELLED">Cancelled</option>
           </select>

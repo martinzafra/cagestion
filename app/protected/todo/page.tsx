@@ -27,7 +27,7 @@ interface BookingRow {
   id: string;
   booking_ref: string;
   guest_name: string;
-  status: 'CONFIRMED' | 'PENDING CONFIRMATION' | 'CANCELLED' | 'FINISHED';
+  status: 'CONFIRMED' | 'PENDING CONFIRMATION' | 'CANCELLED' | 'DONE' | 'FINISHED';
   check_in_date: string;
   check_out_date: string;
   apartment_id: string;
@@ -246,11 +246,17 @@ export default function TodoPage() {
         updates[dateField] = null;
       }
     }
-    // Final liquidation sent closes the booking out; un-sending it re-opens
-    // the booking rather than leaving it stuck as Finished.
+    // Final liquidation sent closes the booking out - but only to FINISHED
+    // once the guest has actually left (today past check-out). If they're
+    // still on the property, the admin paperwork is done but the stay isn't
+    // over yet, so use DONE instead. Un-sending it re-opens the booking
+    // rather than leaving it stuck as Done/Finished.
     if (field === 'final_liquidation' && booking.status !== 'CANCELLED') {
-      if (value === 'SENT') updates.status = 'FINISHED';
-      else if (booking.status === 'FINISHED') updates.status = 'CONFIRMED';
+      if (value === 'SENT') {
+        updates.status = todayISO() > booking.check_out_date ? 'FINISHED' : 'DONE';
+      } else if (booking.status === 'FINISHED' || booking.status === 'DONE') {
+        updates.status = 'CONFIRMED';
+      }
     }
     updateBooking(booking.id, updates);
   };
@@ -307,20 +313,11 @@ export default function TodoPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">To Do</h1>
-          <p className="text-gray-600 mt-1">
-            Track booking status and pending administrative tasks
-          </p>
-        </div>
-        <Switch
-          checked={showCompleted}
-          onChange={setShowCompleted}
-          className="flex items-center gap-2.5 text-sm text-gray-800"
-        >
-          Show also COMPLETED bookings
-        </Switch>
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">To Do</h1>
+        <p className="text-gray-600 mt-1">
+          Track booking status and pending administrative tasks
+        </p>
       </div>
 
       {/* Filter line */}
@@ -391,6 +388,13 @@ export default function TodoPage() {
             <option value="SENT">Sent</option>
             <option value="NA">N/A</option>
           </select>
+          <Switch
+            checked={showCompleted}
+            onChange={setShowCompleted}
+            className="col-span-full flex items-center gap-2.5 text-sm text-gray-800"
+          >
+            Show also COMPLETED bookings
+          </Switch>
         </div>
       </div>
 

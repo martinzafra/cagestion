@@ -8,6 +8,7 @@ const STATUS_COLORS: Record<string, string> = {
   CANCELLED: 'bg-red-100 text-red-800',
   'CHECKED IN': 'bg-blue-100 text-blue-800',
   'CHECKED OUT': 'bg-gray-200 text-gray-700',
+  DONE: 'bg-teal-100 text-teal-800',
   FINISHED: 'bg-purple-100 text-purple-800',
   COMPLETED: 'bg-emerald-100 text-emerald-800',
 };

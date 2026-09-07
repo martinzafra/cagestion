@@ -234,6 +234,7 @@ export default function BookingsPage() {
                 <option value="">All Statuses</option>
                 <option value="CONFIRMED">Confirmed</option>
                 <option value="PENDING CONFIRMATION">Pending Confirmation</option>
+                <option value="DONE">Done</option>
                 <option value="FINISHED">Finished</option>
                 <option value="CANCELLED">Cancelled</option>
               </select>

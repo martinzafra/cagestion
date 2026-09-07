@@ -16,7 +16,6 @@ interface BookingsListProps {
 type SortColumn =
   | 'apartment'
   | 'agent'
-  | 'booking_ref'
   | 'guest_name'
   | 'check_in_date'
   | 'check_out_date'
@@ -85,8 +84,6 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
         return booking.apartment?.name?.toLowerCase() || '';
       case 'agent':
         return booking.agent?.name?.toLowerCase() || '';
-      case 'booking_ref':
-        return booking.booking_ref?.toLowerCase() || '';
       case 'check_in_date':
         return booking.check_in_date || '';
       case 'check_out_date':
@@ -135,13 +132,12 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
 
   return (
     <div className="card overflow-x-auto">
-      <table className="table">
+      <table className="table text-xs [&_th]:text-xs [&_th]:px-2 [&_th]:py-1.5 [&_td]:text-xs [&_td]:px-2 [&_td]:py-1.5">
         <thead>
           <tr>
             <SortableHeader column="apartment">Apartment</SortableHeader>
             <SortableHeader column="agent">Agent</SortableHeader>
-            <SortableHeader column="booking_ref">Booking Ref</SortableHeader>
-            <SortableHeader column="guest_name">Guest</SortableHeader>
+            <SortableHeader column="guest_name">Guest/Booking Ref</SortableHeader>
             <SortableHeader column="check_in_date">Check-in</SortableHeader>
             <SortableHeader column="check_out_date">Check-out</SortableHeader>
             <SortableHeader column="nights">Nights</SortableHeader>
@@ -153,7 +149,7 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
         <tbody>
           {sortedBookings.length === 0 ? (
             <tr>
-              <td colSpan={10} className="text-center py-8 text-gray-500">
+              <td colSpan={9} className="text-center py-8 text-gray-500">
                 No bookings found
               </td>
             </tr>
@@ -175,9 +171,11 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
                     {getAgentBadgeText(booking.agent?.name)}
                   </span>
                 </td>
-                <td>{booking.booking_ref}</td>
-                <td className="font-medium whitespace-nowrap" title={booking.guest_name}>
-                  {truncateText(booking.guest_name || '', GUEST_NAME_MAX_LENGTH)}
+                <td className="whitespace-nowrap" title={booking.guest_name}>
+                  <div className="font-medium">
+                    {truncateText(booking.guest_name || '', GUEST_NAME_MAX_LENGTH)}
+                  </div>
+                  <div className="text-gray-400">{booking.booking_ref}</div>
                 </td>
                 <td>{formatDate(booking.check_in_date)}</td>
                 <td>{formatDate(booking.check_out_date)}</td>
