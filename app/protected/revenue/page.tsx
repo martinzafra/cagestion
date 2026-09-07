@@ -79,7 +79,7 @@ export default function RevenuePage() {
         fetchAllowedApartments(),
         supabase
           .from('bookings')
-          .select('id, guest_name, check_in_date, booking_ref')
+          .select('id, guest_name, check_in_date, booking_ref, apartment_id, status')
           .order('check_in_date', { ascending: false }),
         supabase.from('inventory_invoice_items').select('*').order('name'),
       ]);
@@ -383,11 +383,18 @@ export default function RevenuePage() {
                   required
                 >
                   <option value="">Select Booking</option>
-                  {bookings.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {getBookingDisplay(b)}
-                    </option>
-                  ))}
+                  {bookings
+                    .filter(
+                      (b) =>
+                        (!formData.apartment_id || b.apartment_id === formData.apartment_id) &&
+                        ((b.status !== 'FINISHED' && b.status !== 'CANCELLED') ||
+                          b.id === formData.booking_id)
+                    )
+                    .map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {getBookingDisplay(b)}
+                      </option>
+                    ))}
                 </select>
               </div>
             </div>
