@@ -60,6 +60,13 @@ const PHASE_STYLE: Record<string, { bg: string; text: string }> = Object.fromEnt
   WORKFLOW_PHASES.map((p) => [p.key, { bg: p.bg, text: p.text }])
 );
 
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 // A booking's admin tasks are done once each is either completed or marked
 // not applicable - nothing left in a "to be done" state. This is what moves
 // a booking into TO INV/EXP; it only reaches COMPLETED once inv_exp_done is
@@ -502,7 +509,7 @@ export default function TodoPage() {
                   return (
                     <tr
                       key={b.id}
-                      style={phaseStyle ? { backgroundColor: phaseStyle.bg } : undefined}
+                      style={phaseStyle ? { backgroundColor: hexToRgba(phaseStyle.bg, 0.35) } : undefined}
                     >
                       <td>{b.apartment?.name}</td>
                       <td>
