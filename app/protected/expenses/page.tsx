@@ -80,7 +80,7 @@ export default function ExpensesPage() {
         supabase.from('inventory_expense_types').select('*').order('name'),
         supabase
           .from('bookings')
-          .select('id, guest_name, booking_ref, check_in_date, check_out_date, status')
+          .select('id, guest_name, booking_ref, check_in_date, check_out_date, status, apartment_id')
           .order('check_in_date', { ascending: false }),
       ]);
 
@@ -520,8 +520,9 @@ export default function ExpensesPage() {
                   {bookings
                     .filter(
                       (b) =>
-                        (b.status !== 'FINISHED' && b.status !== 'CANCELLED') ||
-                        b.id === formData.booking_id
+                        (!formData.apartment_id || b.apartment_id === formData.apartment_id) &&
+                        ((b.status !== 'FINISHED' && b.status !== 'CANCELLED') ||
+                          b.id === formData.booking_id)
                     )
                     .map((b) => (
                       <option key={b.id} value={b.id}>
