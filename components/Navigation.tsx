@@ -66,7 +66,7 @@ const Navigation: React.FC<NavigationProps> = ({ userRole = 'agent', userName })
             </div>
             <button
               onClick={handleLogout}
-              className="p-2 rounded-md hover:bg-blue-700 transition"
+              className="p-2.5 rounded-md hover:bg-blue-700 transition"
               title="Logout"
             >
               <LogOut size={18} />
@@ -75,7 +75,7 @@ const Navigation: React.FC<NavigationProps> = ({ userRole = 'agent', userName })
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="md:hidden p-2 rounded-md hover:bg-blue-700 transition"
+              className="md:hidden p-2.5 rounded-md hover:bg-blue-700 transition"
             >
               {isOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
@@ -89,7 +89,7 @@ const Navigation: React.FC<NavigationProps> = ({ userRole = 'agent', userName })
               <Link
                 key={item.href}
                 href={item.href}
-                className="block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700 transition"
+                className="block px-3 py-3 rounded-md text-base font-medium hover:bg-blue-700 transition"
                 onClick={() => setIsOpen(false)}
               >
                 {item.label}

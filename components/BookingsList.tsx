@@ -214,7 +214,7 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
           {bookings
             .filter((b) => b.id === expandedId)
             .map((booking) => (
-              <div key={booking.id} className="grid grid-cols-2 gap-4">
+              <div key={booking.id} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Phone</p>
                   <p className="font-medium">{booking.guest_phone || '-'}</p>
@@ -236,7 +236,7 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
                   <p className="font-medium">{booking.platform_invoice}</p>
                 </div>
                 {booking.comments && (
-                  <div className="col-span-2">
+                  <div className="col-span-full">
                     <p className="text-sm text-gray-600">Comments</p>
                     <p className="font-medium">{booking.comments}</p>
                   </div>

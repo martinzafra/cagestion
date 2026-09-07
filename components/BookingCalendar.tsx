@@ -118,6 +118,11 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({
         <div className="bg-gray-100 px-3 py-2 font-semibold text-center">
           {monthName}
         </div>
+        {/* Horizontal scroll on narrow screens keeps day cells wide enough
+            for the booking bars' text to stay legible, instead of squeezing
+            all 7 columns into the viewport. */}
+        <div className="overflow-x-auto">
+        <div className="min-w-[480px]">
         <div className="grid grid-cols-7 gap-px bg-gray-200">
           {WEEKDAYS.map((day) => (
             <div key={day} className="bg-white p-1.5 text-center font-semibold text-xs">
@@ -206,6 +211,8 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({
               </div>
             );
           })}
+        </div>
+        </div>
         </div>
       </div>
     );

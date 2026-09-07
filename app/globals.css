@@ -69,12 +69,15 @@ input[type='number'] {
     @apply px-3 py-1.5 text-sm;
   }
 
+  /* text-base (16px) by default: below that, iOS Safari auto-zooms the
+     page on focus. Dense grids that override to a smaller size do so
+     responsively (text-base sm:text-sm) so mobile keeps 16px. */
   .input {
-    @apply w-full px-3.5 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-azure focus:border-azure transition;
+    @apply w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-azure focus:border-azure transition;
   }
 
   .select {
-    @apply w-full px-3.5 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-azure focus:border-azure bg-white transition;
+    @apply w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-azure focus:border-azure bg-white transition;
   }
 
   .label {

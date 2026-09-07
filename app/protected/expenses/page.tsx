@@ -441,6 +441,7 @@ export default function ExpensesPage() {
                 <label className="label">Amount € *</label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   value={formData.amount}
                   onChange={(e) =>
                     setFormData({
@@ -457,6 +458,7 @@ export default function ExpensesPage() {
                 <label className="label">VAT €</label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   value={formData.vat}
                   onChange={(e) =>
                     setFormData({ ...formData, vat: parseFloat(e.target.value) || 0 })

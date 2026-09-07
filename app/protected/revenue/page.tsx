@@ -417,6 +417,7 @@ export default function RevenuePage() {
                 <label className="label">Total Services €</label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   value={formData.total_services}
                   onChange={(e) =>
                     setFormData({
@@ -432,6 +433,7 @@ export default function RevenuePage() {
                 <label className="label">Commission %</label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   value={formData.commission_percentage}
                   onChange={(e) =>
                     setFormData({

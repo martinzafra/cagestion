@@ -517,7 +517,7 @@ export default function TodoPage() {
                               )
                             }
                             disabled={b.platform_invoice !== 'SENT'}
-                            className="input w-28 text-xs px-1.5 py-1"
+                            className="input w-28 text-base sm:text-xs px-1.5 py-1"
                           />
                         </div>
                       </td>

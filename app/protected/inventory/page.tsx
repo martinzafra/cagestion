@@ -479,11 +479,12 @@ export default function InventoryPage() {
                 )}
               </div>
               {activeTab === 'apartments' && (
-                <div className="mt-3 pt-3 border-t grid grid-cols-3 gap-2">
+                <div className="mt-3 pt-3 border-t grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div>
                     <label className="text-xs text-gray-500">Commission %</label>
                     <input
                       type="number"
+                      inputMode="decimal"
                       step="0.01"
                       value={item.commission_percentage ?? 0}
                       onChange={(e) =>
@@ -500,7 +501,7 @@ export default function InventoryPage() {
                           parseFloat(e.target.value) || 0
                         )
                       }
-                      className="input text-sm"
+                      className="input text-base sm:text-sm"
                     />
                   </div>
                   <div>
@@ -511,7 +512,7 @@ export default function InventoryPage() {
                         handleApartmentFieldChange(item.id, 'contract', e.target.value as any);
                         persistApartmentField(item.id, 'contract', e.target.value);
                       }}
-                      className="select text-sm"
+                      className="select text-base sm:text-sm"
                     >
                       <option value="None">None</option>
                       <option value="Yearly">Yearly</option>
@@ -529,7 +530,7 @@ export default function InventoryPage() {
                       onBlur={(e) =>
                         persistApartmentField(item.id, 'contract_date', e.target.value || null)
                       }
-                      className="input text-sm"
+                      className="input text-base sm:text-sm"
                     />
                   </div>
                 </div>

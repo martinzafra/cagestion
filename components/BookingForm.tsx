@@ -526,6 +526,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
           <label className="label">Number of Guests</label>
           <input
             type="number"
+            inputMode="numeric"
             name="number_of_guests"
             value={formData.number_of_guests}
             onChange={handleChange}
@@ -559,6 +560,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
           <label className="label">Deposit Amount</label>
           <input
             type="number"
+            inputMode="decimal"
             name="deposit_amount"
             value={formData.deposit_amount || ''}
             onChange={handleChange}
@@ -616,6 +618,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
           </label>
           <input
             type="number"
+            inputMode="decimal"
             name="daily_price"
             value={formData.daily_price}
             onChange={handleChange}
@@ -631,6 +634,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
           </label>
           <input
             type="number"
+            inputMode="decimal"
             name="total_rent"
             value={formData.total_rent ?? ''}
             onChange={handleChange}
@@ -644,6 +648,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
           <label className="label">Cleaning Charge</label>
           <input
             type="number"
+            inputMode="decimal"
             name="cleaning_charge"
             value={formData.cleaning_charge}
             onChange={handleChange}
@@ -659,6 +664,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
           <label className="label">Other Charge</label>
           <input
             type="number"
+            inputMode="decimal"
             name="other_charge"
             value={formData.other_charge}
             onChange={handleChange}
