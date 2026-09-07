@@ -80,7 +80,7 @@ export default function ExpensesPage() {
         supabase.from('inventory_expense_types').select('*').order('name'),
         supabase
           .from('bookings')
-          .select('id, guest_name, booking_ref, check_in_date, check_out_date')
+          .select('id, guest_name, booking_ref, check_in_date, check_out_date, status')
           .order('check_in_date', { ascending: false }),
       ]);
 
@@ -106,6 +106,16 @@ export default function ExpensesPage() {
     if (!formData.apartment_id || !formData.expense_category_id || !formData.vendor) {
       toast.error('Please fill in all required fields');
       return;
+    }
+
+    if (formData.booking_id) {
+      const linkedBooking = bookings.find((b) => b.id === formData.booking_id);
+      if (linkedBooking?.status === 'FINISHED') {
+        const proceed = confirm(
+          'The booking is marked as FINISHED so it has been liquidated. Are you sure you want to modify the expense?'
+        );
+        if (!proceed) return;
+      }
     }
 
     try {
@@ -498,7 +508,7 @@ export default function ExpensesPage() {
                 </select>
               </div>
               <div>
-                <label className="label">Booking (Optional)</label>
+                <label className="label">Booking allocation</label>
                 <select
                   value={formData.booking_id}
                   onChange={(e) =>
@@ -507,11 +517,17 @@ export default function ExpensesPage() {
                   className="select"
                 >
                   <option value="">General Expense</option>
-                  {bookings.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.guest_name}, {b.booking_ref}, {formatBookingDateRange(b.check_in_date, b.check_out_date)}
-                    </option>
-                  ))}
+                  {bookings
+                    .filter(
+                      (b) =>
+                        (b.status !== 'FINISHED' && b.status !== 'CANCELLED') ||
+                        b.id === formData.booking_id
+                    )
+                    .map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.guest_name}, {formatBookingDateRange(b.check_in_date, b.check_out_date)}, {b.booking_ref}
+                      </option>
+                    ))}
                 </select>
               </div>
             </div>
