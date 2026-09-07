@@ -45,14 +45,22 @@ interface BookingRow {
 const todayISO = () => new Date().toISOString().split('T')[0];
 
 // The ordered workflow this page walks a booking through - shown as the
-// chevron strip at the top of the page.
-const WORKFLOW_PHASES = ['CONFIRMED', 'CHECKED IN', 'CHECK OUT', 'TO INV/EXP', 'COMPLETED'];
-const WORKFLOW_COLORS = ['#E0A526', '#E2791C', '#C93B8F', '#7A4FA8', '#4A5FBD'];
-// Same colors as the workflow banner, keyed by phase, so the "To Do Status"
-// badge in the grid matches the step it's on. Statuses outside the workflow
-// (Pending Confirmation) fall back to StatusBadge's own default palette.
-const TODO_STATUS_COLOR: Record<string, string> = Object.fromEntries(
-  WORKFLOW_PHASES.map((phase, idx) => [phase, WORKFLOW_COLORS[idx]])
+// chevron strip at the top of the page. Pending/Confirmed use the same pale
+// two-tone colors as their badges on the Bookings screen; the later phases
+// get their own solid color with white text.
+const WORKFLOW_PHASES: { key: string; label: string; bg: string; text: string }[] = [
+  { key: 'PENDING CONFIRMATION', label: 'PENDING', bg: '#FEF9C3', text: '#854D0E' },
+  { key: 'CONFIRMED', label: 'CONFIRMED', bg: '#DCFCE7', text: '#166534' },
+  { key: 'CHECK IN', label: 'CHECK IN', bg: '#14B8A6', text: '#FFFFFF' },
+  { key: 'CHECK OUT', label: 'CHECK OUT', bg: '#38BDF8', text: '#FFFFFF' },
+  { key: 'TO INV/EXP', label: 'TO INV/EXP', bg: '#582294', text: '#FFFFFF' },
+  { key: 'COMPLETED', label: 'COMPLETED', bg: '#CD27A4', text: '#FFFFFF' },
+];
+// The solid-color phases only, keyed for the grid's "To Do Status" badge and
+// row tint. Pending/Confirmed aren't included here - they already render
+// correctly via StatusBadge's own palette, which matches Bookings exactly.
+const SOLID_PHASE_COLOR: Record<string, string> = Object.fromEntries(
+  WORKFLOW_PHASES.filter((p) => p.text === '#FFFFFF').map((p) => [p.key, p.bg])
 );
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -76,7 +84,7 @@ function isAdminTasksComplete(b: BookingRow): boolean {
 
 // Computed automatically: admin tasks done + Inv/Exp reconciled -> Completed,
 // admin tasks done but Inv/Exp still pending -> To Inv/Exp, past checkout ->
-// Check Out, past check-in -> Checked In, otherwise the booking hasn't
+// Check Out, past check-in -> Check In, otherwise the booking hasn't
 // started yet so show its reservation status (Confirmed / Pending
 // Confirmation / Cancelled).
 function computeTodoStatus(b: BookingRow): string {
@@ -85,17 +93,15 @@ function computeTodoStatus(b: BookingRow): string {
   if (adminDone) return 'TO INV/EXP';
   const today = todayISO();
   if (today >= b.check_out_date) return 'CHECK OUT';
-  if (today >= b.check_in_date) return 'CHECKED IN';
+  if (today >= b.check_in_date) return 'CHECK IN';
   return b.status;
 }
 
+// Row tint for the pale (Pending/Confirmed) phases only - the solid phases
+// get their row tint computed inline from SOLID_PHASE_COLOR instead.
 const ROW_TINT: Record<string, string> = {
   CONFIRMED: 'bg-green-50',
   'PENDING CONFIRMATION': 'bg-yellow-50',
-  'CHECKED IN': 'bg-blue-50',
-  'CHECK OUT': 'bg-gray-50',
-  'TO INV/EXP': 'bg-orange-50',
-  COMPLETED: 'bg-purple-50',
 };
 
 export default function TodoPage() {
@@ -361,16 +367,17 @@ export default function TodoPage() {
 
       {/* Workflow legend */}
       <div className="card overflow-x-auto">
-        <div className="flex min-w-[560px]">
+        <div className="flex min-w-[660px]">
           {WORKFLOW_PHASES.map((phase, idx) => {
             const isFirst = idx === 0;
             const isLast = idx === WORKFLOW_PHASES.length - 1;
             return (
               <div
-                key={phase}
-                className="flex-1 flex items-center justify-center text-white text-[11px] sm:text-xs font-bold uppercase tracking-wide py-3 text-center px-3"
+                key={phase.key}
+                className="flex-1 flex items-center justify-center text-[11px] sm:text-xs font-bold uppercase tracking-wide py-3 text-center px-3"
                 style={{
-                  backgroundColor: WORKFLOW_COLORS[idx],
+                  backgroundColor: phase.bg,
+                  color: phase.text,
                   marginLeft: isFirst ? 0 : -18,
                   clipPath: isFirst
                     ? 'polygon(0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%)'
@@ -379,7 +386,7 @@ export default function TodoPage() {
                     : 'polygon(18px 50%, 0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%)',
                 }}
               >
-                {phase}
+                {phase.label}
               </div>
             );
           })}
@@ -414,9 +421,9 @@ export default function TodoPage() {
             className="select"
           >
             <option value="">All To Do Status</option>
-            <option value="CONFIRMED">Confirmed</option>
             <option value="PENDING CONFIRMATION">Pending Confirmation</option>
-            <option value="CHECKED IN">Checked In</option>
+            <option value="CONFIRMED">Confirmed</option>
+            <option value="CHECK IN">Check In</option>
             <option value="CHECK OUT">Check Out</option>
             <option value="TO INV/EXP">To Inv/Exp</option>
             <option value="COMPLETED">Completed</option>
@@ -508,7 +515,7 @@ export default function TodoPage() {
               ) : (
                 sortedBookings.map((b) => {
                   const todoStatus = computeTodoStatus(b);
-                  const workflowColor = TODO_STATUS_COLOR[todoStatus];
+                  const workflowColor = SOLID_PHASE_COLOR[todoStatus];
                   return (
                     <tr
                       key={b.id}
@@ -523,10 +530,10 @@ export default function TodoPage() {
                       <td className="whitespace-nowrap">{formatDate(b.check_in_date)}</td>
                       <td className="whitespace-nowrap">{formatDate(b.check_out_date)}</td>
                       <td>
-                        {TODO_STATUS_COLOR[todoStatus] ? (
+                        {workflowColor ? (
                           <span
                             className="px-2.5 py-1 rounded-full text-sm font-medium text-white whitespace-nowrap"
-                            style={{ backgroundColor: hexToRgba(TODO_STATUS_COLOR[todoStatus], 0.55) }}
+                            style={{ backgroundColor: hexToRgba(workflowColor, 0.55) }}
                           >
                             {todoStatus}
                           </span>
