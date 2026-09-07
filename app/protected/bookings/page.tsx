@@ -9,7 +9,7 @@ import BookingCalendar from '@/components/BookingCalendar';
 import ApartmentChipFilter from '@/components/ApartmentChipFilter';
 import Switch from '@/components/Switch';
 import { getApartmentColorMap } from '@/lib/apartmentColors';
-import { fetchAllowedApartments } from '@/lib/apartmentAccess';
+import { fetchAllowedApartments, fetchAllApartments } from '@/lib/apartmentAccess';
 import toast from 'react-hot-toast';
 
 type ViewMode = 'list' | 'calendar';
@@ -19,8 +19,10 @@ export default function BookingsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingBookingId, setEditingBookingId] = useState<string | undefined>(undefined);
   const [bookings, setBookings] = useState<any[]>([]);
+  const [calendarBookings, setCalendarBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [apartments, setApartments] = useState<any[]>([]);
+  const [allApartments, setAllApartments] = useState<any[]>([]);
   const [calendarApartmentIds, setCalendarApartmentIds] = useState<string[]>([]);
   const [showFinished, setShowFinished] = useState(false);
 
@@ -34,6 +36,7 @@ export default function BookingsPage() {
 
   useEffect(() => {
     fetchBookings();
+    fetchCalendarBookings();
     fetchApartments();
   }, []);
 
@@ -60,13 +63,36 @@ export default function BookingsPage() {
     }
   };
 
+  // Calendar-only read path: bypasses the per-agent apartment scoping (via
+  // get_calendar_bookings(), a SECURITY DEFINER function) so every user sees
+  // every apartment's bookings in the calendar, while the list view above
+  // keeps the normal restricted query.
+  const fetchCalendarBookings = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_calendar_bookings');
+      if (error) throw error;
+      setCalendarBookings(
+        (data || []).map((row: any) => ({
+          ...row,
+          apartment: { name: row.apartment_name },
+        }))
+      );
+    } catch (error) {
+      toast.error('Failed to fetch calendar bookings');
+    }
+  };
+
   const fetchApartments = async () => {
     try {
-      const data = await fetchAllowedApartments();
-      setApartments(data);
+      const [allowed, all] = await Promise.all([fetchAllowedApartments(), fetchAllApartments()]);
+      setApartments(allowed);
+      setAllApartments(all);
+      // Calendar starts scoped to the apartments this user manages, but every
+      // apartment is still selectable — checking additional chips shows the
+      // full calendar.
       setCalendarApartmentIds((prev) =>
         prev.length === 0
-          ? data.filter((a) => a.active !== false).map((a) => a.id)
+          ? allowed.filter((a) => a.active !== false).map((a) => a.id)
           : prev
       );
     } catch (error) {
@@ -89,6 +115,7 @@ export default function BookingsPage() {
     setShowForm(false);
     setEditingBookingId(undefined);
     fetchBookings();
+    fetchCalendarBookings();
     toast.success(editingBookingId ? 'Booking updated successfully' : 'Booking created successfully');
   };
 
@@ -98,7 +125,7 @@ export default function BookingsPage() {
   };
 
   const filteredBookings = bookings.filter((b) => {
-    if (!showFinished && b.status === 'FINISHED') return false;
+    if (!showFinished && (b.status === 'FINISHED' || b.status === 'CANCELLED')) return false;
     if (listFilters.apartment_id && b.apartment_id !== listFilters.apartment_id)
       return false;
     if (listFilters.status && b.status !== listFilters.status) return false;
@@ -116,6 +143,8 @@ export default function BookingsPage() {
 
   const colorMap = getApartmentColorMap(apartments);
   const activeApartments = apartments.filter((a) => a.active !== false);
+  const calendarColorMap = getApartmentColorMap(allApartments);
+  const activeAllApartments = allApartments.filter((a) => a.active !== false);
 
   const toggleCalendarApartment = (id: string) => {
     setCalendarApartmentIds((prev) =>
@@ -246,7 +275,10 @@ export default function BookingsPage() {
           </div>
           <BookingsList
             bookings={filteredBookings}
-            onRefresh={fetchBookings}
+            onRefresh={() => {
+              fetchBookings();
+              fetchCalendarBookings();
+            }}
             onEdit={handleEditBooking}
           />
         </>
@@ -255,15 +287,15 @@ export default function BookingsPage() {
           <div className="mb-4">
             <label className="label">Filter by Apartment</label>
             <ApartmentChipFilter
-              apartments={activeApartments}
+              apartments={activeAllApartments}
               selectedIds={calendarApartmentIds}
               onToggle={toggleCalendarApartment}
-              colorMap={colorMap}
+              colorMap={calendarColorMap}
             />
           </div>
           <BookingCalendar
-            bookings={bookings}
-            apartments={apartments}
+            bookings={calendarBookings}
+            apartments={allApartments}
             selectedApartmentIds={calendarApartmentIds}
           />
         </div>

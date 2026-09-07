@@ -48,3 +48,12 @@ export async function fetchAllowedApartments(): Promise<any[]> {
 
   return allowed;
 }
+
+// Unrestricted apartment list — every apartment regardless of agent
+// assignment. Used where every user should be able to see/select any
+// apartment (e.g. the Bookings calendar), as opposed to fetchAllowedApartments
+// above which scopes the list to what the current agent manages.
+export async function fetchAllApartments(): Promise<any[]> {
+  const { data } = await supabase.from('inventory_apartments').select('*').order('name');
+  return data || [];
+}

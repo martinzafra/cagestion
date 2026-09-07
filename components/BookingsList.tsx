@@ -15,6 +15,7 @@ interface BookingsListProps {
 
 type SortColumn =
   | 'apartment'
+  | 'agent'
   | 'booking_ref'
   | 'guest_name'
   | 'check_in_date'
@@ -22,6 +23,26 @@ type SortColumn =
   | 'nights'
   | 'guest_total_amount'
   | 'status';
+
+// Fixed initials per agent, not a generic first-letters transform — these
+// are the agents' own shorthand, independent of how "Basia"/"Karo"/"Both"
+// happen to be spelled in the database.
+const AGENT_BADGE_TEXT: Record<string, string> = {
+  Basia: 'BM',
+  Karo: 'KW',
+  Both: 'CA',
+};
+
+function getAgentBadgeText(agentName?: string): string {
+  if (!agentName) return '—';
+  return AGENT_BADGE_TEXT[agentName] || agentName.slice(0, 2).toUpperCase();
+}
+
+const GUEST_NAME_MAX_LENGTH = 20;
+
+function truncateText(text: string, maxLength: number): string {
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
 
 const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -62,6 +83,8 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
         return booking.guest_name?.toLowerCase() || '';
       case 'apartment':
         return booking.apartment?.name?.toLowerCase() || '';
+      case 'agent':
+        return booking.agent?.name?.toLowerCase() || '';
       case 'booking_ref':
         return booking.booking_ref?.toLowerCase() || '';
       case 'check_in_date':
@@ -92,15 +115,17 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
   const SortableHeader: React.FC<{
     column: SortColumn;
     children: React.ReactNode;
-    align?: 'left' | 'right';
+    align?: 'left' | 'center' | 'right';
   }> = ({ column, children, align = 'left' }) => (
     <th
       className={`cursor-pointer select-none hover:bg-gray-200 ${
-        align === 'right' ? 'text-right' : ''
+        align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : ''
       }`}
       onClick={() => handleSort(column)}
     >
-      <span className="inline-flex items-center gap-1">
+      <span
+        className={`inline-flex items-center gap-1 ${align === 'center' ? 'justify-center' : ''}`}
+      >
         {children}
         {sortColumn === column &&
           (sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
@@ -114,20 +139,21 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
         <thead>
           <tr>
             <SortableHeader column="apartment">Apartment</SortableHeader>
+            <SortableHeader column="agent">Agent</SortableHeader>
             <SortableHeader column="booking_ref">Booking Ref</SortableHeader>
             <SortableHeader column="guest_name">Guest</SortableHeader>
             <SortableHeader column="check_in_date">Check-in</SortableHeader>
             <SortableHeader column="check_out_date">Check-out</SortableHeader>
             <SortableHeader column="nights">Nights</SortableHeader>
             <SortableHeader column="guest_total_amount" align="right">Total Amount</SortableHeader>
-            <SortableHeader column="status">Status</SortableHeader>
+            <SortableHeader column="status" align="center">Status</SortableHeader>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {sortedBookings.length === 0 ? (
             <tr>
-              <td colSpan={9} className="text-center py-8 text-gray-500">
+              <td colSpan={10} className="text-center py-8 text-gray-500">
                 No bookings found
               </td>
             </tr>
@@ -141,16 +167,26 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
                 }
               >
                 <td>{booking.apartment?.name}</td>
+                <td>
+                  <span
+                    title={booking.agent?.name || 'No agent'}
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-azure text-white text-xs font-bold"
+                  >
+                    {getAgentBadgeText(booking.agent?.name)}
+                  </span>
+                </td>
                 <td>{booking.booking_ref}</td>
-                <td className="font-medium">{booking.guest_name}</td>
+                <td className="font-medium whitespace-nowrap" title={booking.guest_name}>
+                  {truncateText(booking.guest_name || '', GUEST_NAME_MAX_LENGTH)}
+                </td>
                 <td>{formatDate(booking.check_in_date)}</td>
                 <td>{formatDate(booking.check_out_date)}</td>
                 <td>{booking.nights}</td>
                 <td className="font-semibold text-right">
                   {formatCurrency(booking.guest_total_amount || 0)}
                 </td>
-                <td>
-                  <StatusBadge status={booking.status} />
+                <td className="text-center">
+                  <StatusBadge status={booking.status} wrap />
                 </td>
                 <td onClick={(e) => e.stopPropagation()}>
                   <button
@@ -192,10 +228,6 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
                 <div>
                   <p className="text-sm text-gray-600">Platform</p>
                   <p className="font-medium">{booking.platform?.name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Agent</p>
-                  <p className="font-medium">{booking.agent?.name}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Police Registration</p>

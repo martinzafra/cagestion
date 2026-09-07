@@ -12,11 +12,22 @@ const STATUS_COLORS: Record<string, string> = {
   COMPLETED: 'bg-emerald-100 text-emerald-800',
 };
 
-export default function StatusBadge({ status }: { status: string }) {
+// Shorter text for display only - the underlying status value (used for
+// color lookup, filtering, and storage) is untouched.
+const STATUS_LABELS: Record<string, string> = {
+  'PENDING CONFIRMATION': 'PENDING',
+};
+
+export default function StatusBadge({ status, wrap = false }: { status: string; wrap?: boolean }) {
   const color = STATUS_COLORS[status] || 'bg-gray-100 text-gray-800';
+  const label = STATUS_LABELS[status] || status;
   return (
-    <span className={`px-2.5 py-1 rounded-full text-sm font-medium whitespace-nowrap ${color}`}>
-      {status}
+    <span
+      className={`px-2.5 py-1 rounded-full text-sm font-medium ${color} ${
+        wrap ? 'inline-block max-w-[140px] text-center leading-tight' : 'whitespace-nowrap'
+      }`}
+    >
+      {label}
     </span>
   );
 }
