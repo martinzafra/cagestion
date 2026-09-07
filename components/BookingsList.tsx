@@ -38,17 +38,19 @@ function getAgentBadgeText(agentName?: string): string {
 }
 
 // Fixed initials + brand color per platform, not a generic transform.
-const PLATFORM_BADGE: Record<string, { text: string; className: string }> = {
-  Bookings: { text: 'Bo', className: 'bg-blue-500' },
-  Airbnb: { text: 'Ai', className: 'bg-red-500' },
-  Idealista: { text: 'id', className: 'bg-green-500' },
+// Booking.com, Airbnb and Idealista use their real official icon colors
+// (sampled from their app icons); the rest use the app's own palette.
+const PLATFORM_BADGE: Record<string, { text: string; className: string; textClassName?: string }> = {
+  Bookings: { text: 'Bo', className: 'bg-[#003580]' },
+  Airbnb: { text: 'Ai', className: 'bg-[#FF5A5F]' },
+  Idealista: { text: 'id', className: 'bg-[#D9F563]', textClassName: 'text-black' },
   Vrvo: { text: 'Vr', className: 'bg-teal-500' },
   Clara: { text: 'C', className: 'bg-orange-500' },
   Owners: { text: 'Ow', className: 'bg-gray-500' },
   Organic: { text: 'Or', className: 'bg-brown-500' },
 };
 
-function getPlatformBadge(platformName?: string): { text: string; className: string } {
+function getPlatformBadge(platformName?: string): { text: string; className: string; textClassName?: string } {
   if (!platformName) return { text: '—', className: 'bg-gray-400' };
   return PLATFORM_BADGE[platformName] || { text: platformName.slice(0, 2), className: 'bg-gray-400' };
 }
@@ -199,7 +201,9 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
                     return (
                       <span
                         title={booking.platform?.name || 'No platform'}
-                        className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-xs font-bold ${badge.className}`}
+                        className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${
+                          badge.textClassName || 'text-white'
+                        } ${badge.className}`}
                       >
                         {badge.text}
                       </span>
