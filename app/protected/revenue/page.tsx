@@ -72,7 +72,7 @@ export default function RevenuePage() {
           .select(`
             *,
             apartment:inventory_apartments(name),
-            booking:bookings(guest_name, check_in_date),
+            booking:bookings(guest_name, check_in_date, booking_ref),
             item:inventory_invoice_items(name)
           `)
           .order('revenue_date', { ascending: false }),
@@ -547,7 +547,7 @@ export default function RevenuePage() {
                 <SortableHeader column="revenue_type">Type</SortableHeader>
                 <SortableHeader column="invoice_number">Invoice #</SortableHeader>
                 <SortableHeader column="revenue_date">Date</SortableHeader>
-                <SortableHeader column="guest_name">Guest</SortableHeader>
+                <SortableHeader column="guest_name">Guest/Booking Ref</SortableHeader>
                 <SortableHeader column="apartment">Apartment</SortableHeader>
                 <SortableHeader column="item">Item</SortableHeader>
                 <SortableHeader column="total_services" align="right">Services €</SortableHeader>
@@ -570,7 +570,10 @@ export default function RevenuePage() {
                     <td className="text-sm">{rev.revenue_type}</td>
                     <td className="font-mono text-sm">{rev.invoice_number || '—'}</td>
                     <td>{formatDate(rev.revenue_date)}</td>
-                    <td className="font-medium">{rev.booking?.guest_name}</td>
+                    <td className="whitespace-nowrap">
+                      <div className="font-medium">{rev.booking?.guest_name}</div>
+                      <div className="text-gray-400">{rev.booking?.booking_ref}</div>
+                    </td>
                     <td>{rev.apartment?.name}</td>
                     <td>{rev.item?.name}</td>
                     <td className="text-right">{formatCurrency(rev.total_services)}</td>
