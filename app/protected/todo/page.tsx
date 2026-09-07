@@ -224,10 +224,10 @@ export default function TodoPage() {
     children,
   }) => (
     <th
-      className="cursor-pointer select-none hover:bg-gray-200"
+      className="cursor-pointer select-none hover:bg-gray-200 max-w-[110px]"
       onClick={() => handleSort(column)}
     >
-      <span className="inline-flex items-center gap-1">
+      <span className="inline-flex items-center gap-1 flex-wrap leading-tight">
         {children}
         {sortColumn === column &&
           (sortDirection === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
