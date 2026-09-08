@@ -2,9 +2,18 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { BarChart3, TrendingUp, DollarSign, ChevronLeft, ChevronRight, BedDouble } from 'lucide-react';
+import {
+  BarChart3,
+  TrendingUp,
+  DollarSign,
+  ChevronLeft,
+  ChevronRight,
+  BedDouble,
+  FileSpreadsheet,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatCurrency, formatDate } from '@/lib/calculations';
+import { exportToExcel } from '@/lib/exportExcel';
 
 // ---- Apartment Annual Report -----------------------------------------
 // The report year runs from the apartment's contract anniversary date, not
@@ -116,6 +125,7 @@ export default function ReportsPage() {
   const [periodOffset, setPeriodOffset] = useState(0);
   const [apartmentReport, setApartmentReport] = useState<ApartmentReportData | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [exportingBookings, setExportingBookings] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -397,6 +407,160 @@ export default function ReportsPage() {
     }
   };
 
+  const handleExportBookingsReport = async () => {
+    if (!apartmentReport) return;
+
+    const isAll = selectedApartmentId === 'ALL';
+    const isAllActive = selectedApartmentId === 'ALL_ACTIVE';
+    const isAggregate = isAll || isAllActive;
+    const apt = isAggregate ? null : apartments.find((a) => a.id === selectedApartmentId);
+    if (!isAggregate && !apt) return;
+
+    const activeApartmentIds = apartments.filter((a) => a.active !== false).map((a) => a.id);
+
+    setExportingBookings(true);
+    try {
+      const start = apartmentReport.periodStart;
+      const elapsedEnd = apartmentReport.isInProgress
+        ? new Date().toISOString().split('T')[0]
+        : apartmentReport.periodEnd;
+
+      let bookingsQuery = supabase
+        .from('bookings')
+        .select(
+          `*,
+          agent:inventory_agents(name),
+          apartment:inventory_apartments(name),
+          platform:inventory_platforms(name),
+          payment_type:inventory_payment_types(name)`
+        )
+        .in('status', ['CONFIRMED', 'DONE', 'FINISHED'])
+        .lte('check_in_date', elapsedEnd)
+        .gte('check_out_date', start);
+      if (!isAggregate) bookingsQuery = bookingsQuery.eq('apartment_id', selectedApartmentId);
+      else if (isAllActive) bookingsQuery = bookingsQuery.in('apartment_id', activeApartmentIds);
+
+      const bookingsRes = await bookingsQuery;
+      if (bookingsRes.error) throw bookingsRes.error;
+      let bookings: any[] = bookingsRes.data || [];
+      if (selectedPlatform) {
+        bookings = bookings.filter((b) => (b.platform?.name || 'Other') === selectedPlatform);
+      }
+
+      if (bookings.length === 0) {
+        toast.error('No bookings to export for this selection');
+        return;
+      }
+
+      const bookingIds = bookings.map((b) => b.id);
+
+      const [revenueRes, expensesRes] = await Promise.all([
+        supabase
+          .from('revenue_invoicing')
+          .select('total_services, amount, booking_id, revenue_type, item:inventory_invoice_items(name)')
+          .in('booking_id', bookingIds),
+        supabase
+          .from('expenses')
+          .select('total, booking_id, category:inventory_expense_types(name)')
+          .in('booking_id', bookingIds),
+      ]);
+      if (revenueRes.error) throw revenueRes.error;
+      if (expensesRes.error) throw expensesRes.error;
+
+      const revenueByBooking: Record<
+        string,
+        { invoice: number; collection: number; commission: number }
+      > = {};
+      (revenueRes.data || []).forEach((r: any) => {
+        if (!r.booking_id) return;
+        const entry = revenueByBooking[r.booking_id] || { invoice: 0, collection: 0, commission: 0 };
+        if (r.revenue_type === 'INVOICE') entry.invoice += r.total_services || 0;
+        if (r.revenue_type === 'COLLECTION') entry.collection += r.total_services || 0;
+        if (r.item?.name === 'Commission') entry.commission += r.amount || 0;
+        revenueByBooking[r.booking_id] = entry;
+      });
+
+      const expensesByBooking: Record<
+        string,
+        { cleanLaundry: number; other: number; supplies: number }
+      > = {};
+      (expensesRes.data || []).forEach((e: any) => {
+        if (!e.booking_id) return;
+        const entry = expensesByBooking[e.booking_id] || { cleanLaundry: 0, other: 0, supplies: 0 };
+        const categoryName = e.category?.name;
+        if (categoryName === 'Cleaning' || categoryName === 'Laundry') entry.cleanLaundry += e.total || 0;
+        else if (categoryName === 'Other') entry.other += e.total || 0;
+        else if (categoryName === 'Supplies') entry.supplies += e.total || 0;
+        expensesByBooking[e.booking_id] = entry;
+      });
+
+      const rows = bookings.map((b) => {
+        const rev = revenueByBooking[b.id] || { invoice: 0, collection: 0, commission: 0 };
+        const exp = expensesByBooking[b.id] || { cleanLaundry: 0, other: 0, supplies: 0 };
+        return {
+          ...b,
+          _revenueInvoice: rev.invoice,
+          _revenueCollection: rev.collection,
+          _caCommission: rev.commission,
+          _expCleanLaundry: exp.cleanLaundry,
+          _expOther: exp.other,
+          _expSupplies: exp.supplies,
+          _caOther: (b.cleaning_charge || 0) - exp.cleanLaundry,
+        };
+      });
+
+      const namePart = apartmentReport.apartmentName.replace(/\s+/g, '-');
+      const platformPart = selectedPlatform ? `-${selectedPlatform.replace(/\s+/g, '-')}` : '';
+
+      exportToExcel(`bookings-report-${namePart}${platformPart}`, rows, [
+        { header: 'Booking Date', value: (b) => b.booking_date },
+        { header: 'Booking Ref', value: (b) => b.booking_ref },
+        { header: 'Status', value: (b) => b.status },
+        { header: 'Agent', value: (b) => b.agent?.name },
+        { header: 'Apartment', value: (b) => b.apartment?.name },
+        { header: 'Platform', value: (b) => b.platform?.name },
+        { header: 'Guest Name', value: (b) => b.guest_name },
+        { header: 'Guest Phone', value: (b) => b.guest_phone },
+        { header: 'Guest Email', value: (b) => b.guest_email },
+        { header: 'Check-in Date', value: (b) => b.check_in_date },
+        { header: 'Check-in Time', value: (b) => b.check_in_time },
+        { header: 'Check-out Date', value: (b) => b.check_out_date },
+        { header: 'Check-out Time', value: (b) => b.check_out_time },
+        { header: 'Nights', value: (b) => b.nights },
+        { header: 'Number of Guests', value: (b) => b.number_of_guests },
+        { header: 'Deposit', value: (b) => b.deposit },
+        { header: 'Deposit Amount', value: (b) => b.deposit_amount },
+        { header: 'Payment Type', value: (b) => b.payment_type?.name },
+        { header: 'Price Basis', value: (b) => b.price_basis },
+        { header: 'Daily Price', value: (b) => b.daily_price },
+        { header: 'Total Rent', value: (b) => b.total_rent },
+        { header: 'Cleaning Charge', value: (b) => b.cleaning_charge },
+        { header: 'Other Charge', value: (b) => b.other_charge },
+        { header: 'Guest Total Amount', value: (b) => b.guest_total_amount },
+        { header: 'Owners Booking', value: (b) => (b.owners_booking ? 'Yes' : 'No') },
+        { header: 'Comments', value: (b) => b.comments },
+        { header: 'Guest Comments', value: (b) => b.guest_comments },
+        { header: 'Police Registration', value: (b) => b.police_registration },
+        { header: 'Platform Invoice', value: (b) => b.platform_invoice },
+        { header: 'Platform Invoice Date', value: (b) => b.platform_invoice_date },
+        { header: 'Final Liquidation', value: (b) => b.final_liquidation },
+        { header: 'Final Liquidation Date', value: (b) => b.final_liquidation_date },
+        { header: 'Inv & Exp Done', value: (b) => (b.inv_exp_done ? 'Yes' : 'No') },
+        { header: 'Revenue Invoice', value: (b) => b._revenueInvoice },
+        { header: 'Revenue Collection', value: (b) => b._revenueCollection },
+        { header: 'CA Commission', value: (b) => b._caCommission },
+        { header: 'Exp Clean&Laundry', value: (b) => b._expCleanLaundry },
+        { header: 'Exp Other', value: (b) => b._expOther },
+        { header: 'Exp Supplies', value: (b) => b._expSupplies },
+        { header: 'CA Other', value: (b) => b._caOther },
+      ]);
+    } catch (error) {
+      toast.error('Failed to export bookings report');
+    } finally {
+      setExportingBookings(false);
+    }
+  };
+
   if (userRole !== 'admin') {
     return null;
   }
@@ -442,6 +606,14 @@ export default function ReportsPage() {
                 </option>
               ))}
             </select>
+            <button
+              onClick={handleExportBookingsReport}
+              disabled={!apartmentReport || exportingBookings}
+              className="btn-secondary flex items-center gap-2 disabled:opacity-50"
+            >
+              <FileSpreadsheet size={18} />
+              {exportingBookings ? 'Exporting...' : 'Export Bookings Report'}
+            </button>
           </div>
         </div>
 
