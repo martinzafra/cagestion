@@ -480,7 +480,7 @@ export default function ReportsPage() {
       const [revenueRes, expensesRes] = await Promise.all([
         supabase
           .from('revenue_invoicing')
-          .select('total_services, amount, booking_id, revenue_type, item:inventory_invoice_items(name)')
+          .select('total_services, amount, vat, booking_id, revenue_type, item:inventory_invoice_items(name)')
           .in('booking_id', bookingIds),
         supabase
           .from('expenses')
@@ -492,14 +492,18 @@ export default function ReportsPage() {
 
       const revenueByBooking: Record<
         string,
-        { invoice: number; collection: number; commission: number }
+        { invoice: number; collection: number; commission: number; commissionVat: number }
       > = {};
       (revenueRes.data || []).forEach((r: any) => {
         if (!r.booking_id) return;
-        const entry = revenueByBooking[r.booking_id] || { invoice: 0, collection: 0, commission: 0 };
+        const entry =
+          revenueByBooking[r.booking_id] || { invoice: 0, collection: 0, commission: 0, commissionVat: 0 };
         if (r.revenue_type === 'INVOICE') entry.invoice += r.total_services || 0;
         if (r.revenue_type === 'COLLECTION') entry.collection += r.total_services || 0;
-        if (r.item?.name === 'Commission') entry.commission += r.amount || 0;
+        if (r.item?.name === 'Commission') {
+          entry.commission += r.amount || 0;
+          entry.commissionVat += r.vat || 0;
+        }
         revenueByBooking[r.booking_id] = entry;
       });
 
@@ -534,22 +538,26 @@ export default function ReportsPage() {
       });
 
       const rows = bookings.map((b) => {
-        const rev = revenueByBooking[b.id] || { invoice: 0, collection: 0, commission: 0 };
+        const rev =
+          revenueByBooking[b.id] || { invoice: 0, collection: 0, commission: 0, commissionVat: 0 };
         const exp =
           expensesByBooking[b.id] ||
           { cleaning: 0, laundry: 0, other: 0, supplies: 0, platformInvoiceNoVat: 0, platformInvoiceVat: 0 };
+        const platformCommissionVat = exp.platformInvoiceVat - exp.platformInvoiceNoVat;
         return {
           ...b,
           _revenueInvoice: rev.invoice,
           _revenueCollection: rev.collection,
           _caCommission: rev.commission,
+          _caCommissionVat: rev.commissionVat,
+          _platformCommission: exp.platformInvoiceNoVat,
+          _platformCommissionVat: platformCommissionVat,
           _expCleaning: exp.cleaning,
           _expLaundry: exp.laundry,
           _expOther: exp.other,
           _expSupplies: exp.supplies,
-          _expPlatformInvoiceNoVat: exp.platformInvoiceNoVat,
-          _expPlatformInvoiceVat: exp.platformInvoiceVat,
-          _caVat: exp.platformInvoiceVat - exp.platformInvoiceNoVat,
+          _netIncome:
+            (b.total_rent || 0) - (rev.commission + rev.commissionVat) - exp.platformInvoiceVat,
           _caOther: (b.cleaning_charge || 0) - (exp.cleaning + exp.laundry),
         };
       });
@@ -572,31 +580,25 @@ export default function ReportsPage() {
         { header: 'Deposit', value: (b) => b.deposit },
         { header: 'Deposit Amount', value: (b) => b.deposit_amount },
         { header: 'Payment Type', value: (b) => b.payment_type?.name },
+        { header: 'Platform Invoice', value: (b) => b.platform_invoice },
+        { header: 'Final Liquidation', value: (b) => b.final_liquidation },
+        { header: 'Inv & Exp Done', value: (b) => (b.inv_exp_done ? 'Yes' : 'No') },
         { header: 'Price Basis', value: (b) => b.price_basis },
         { header: 'Daily Price', value: (b) => b.daily_price },
         { header: 'Total Rent', value: (b) => b.total_rent },
         { header: 'Cleaning Charge', value: (b) => b.cleaning_charge },
         { header: 'Other Charge', value: (b) => b.other_charge },
         { header: 'Guest Total Amount', value: (b) => b.guest_total_amount },
-        { header: 'Owners Booking', value: (b) => (b.owners_booking ? 'Yes' : 'No') },
-        { header: 'Comments', value: (b) => b.comments },
-        { header: 'Guest Comments', value: (b) => b.guest_comments },
-        { header: 'Police Registration', value: (b) => b.police_registration },
-        { header: 'Platform Invoice', value: (b) => b.platform_invoice },
-        { header: 'Platform Invoice Date', value: (b) => b.platform_invoice_date },
-        { header: 'Final Liquidation', value: (b) => b.final_liquidation },
-        { header: 'Final Liquidation Date', value: (b) => b.final_liquidation_date },
-        { header: 'Inv & Exp Done', value: (b) => (b.inv_exp_done ? 'Yes' : 'No') },
-        { header: 'Revenue Invoice', value: (b) => b._revenueInvoice },
-        { header: 'Revenue Collection', value: (b) => b._revenueCollection },
-        { header: 'CA Commission', value: (b) => b._caCommission },
-        { header: 'Exp Cleaning', value: (b) => b._expCleaning },
-        { header: 'Exp Laundry', value: (b) => b._expLaundry },
+        { header: 'CA Commision', value: (b) => b._caCommission },
+        { header: 'CA Commision VAT', value: (b) => b._caCommissionVat },
+        { header: 'Platform commision', value: (b) => b._platformCommission },
+        { header: 'Platform Commision VAT', value: (b) => b._platformCommissionVat },
+        { header: 'Exp. Cleaning', value: (b) => b._expCleaning },
+        { header: 'Exp. Laundry', value: (b) => b._expLaundry },
         { header: 'Exp Other', value: (b) => b._expOther },
         { header: 'Exp Supplies', value: (b) => b._expSupplies },
-        { header: 'Exp Platform Invoice (No VAT)', value: (b) => b._expPlatformInvoiceNoVat },
-        { header: 'Exp Platform Invoice (VAT)', value: (b) => b._expPlatformInvoiceVat },
-        { header: 'CA VAT', value: (b) => b._caVat },
+        { header: 'Net Income', value: (b) => b._netIncome },
+        { header: 'CA Comm', value: (b) => b._caCommission },
         { header: 'CA Other', value: (b) => b._caOther },
       ]);
     } catch (error) {
