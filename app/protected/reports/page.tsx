@@ -65,6 +65,7 @@ interface ApartmentReportData {
   revPar: number;
   projectionFactor: number;
   platformCounts: Record<string, number>;
+  availablePlatforms: string[];
 }
 
 function ReportKpiCard({
@@ -109,7 +110,6 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
 
   const [apartments, setApartments] = useState<any[]>([]);
-  const [platforms, setPlatforms] = useState<any[]>([]);
   const [selectedApartmentId, setSelectedApartmentId] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [periodOffset, setPeriodOffset] = useState(0);
@@ -129,7 +129,6 @@ export default function ReportsPage() {
   useEffect(() => {
     if (userRole) {
       fetchApartments();
-      fetchPlatforms();
     }
   }, [userRole]);
 
@@ -226,16 +225,6 @@ export default function ReportsPage() {
     }
   };
 
-  const fetchPlatforms = async () => {
-    try {
-      const { data, error } = await supabase.from('inventory_platforms').select('id, name').order('name');
-      if (error) throw error;
-      setPlatforms(data || []);
-    } catch (error) {
-      toast.error('Failed to fetch platforms');
-    }
-  };
-
   const fetchApartmentReport = async () => {
     const isAll = selectedApartmentId === 'ALL';
     const apt = isAll ? null : apartments.find((a) => a.id === selectedApartmentId);
@@ -279,6 +268,12 @@ export default function ReportsPage() {
       const elapsedDays = daysBetween(start, elapsedEnd);
       const availableNights = elapsedDays * (isAll ? apartments.length : 1);
       const occupancyRate = availableNights > 0 ? occupiedNights / availableNights : 0;
+
+      // Only offer platforms that actually have a booking in this apartment/
+      // period, not every platform in inventory.
+      const availablePlatforms = Array.from(
+        new Set(allBookings.map((b) => b.platform?.name || 'Other'))
+      ).sort();
 
       // Everything else (revenue, expenses, counts, ADR) is scoped to the
       // selected platform when one is chosen.
@@ -367,6 +362,7 @@ export default function ReportsPage() {
         revPar,
         projectionFactor,
         platformCounts,
+        availablePlatforms,
       });
     } catch (error) {
       toast.error('Failed to load apartment report');
@@ -396,6 +392,7 @@ export default function ReportsPage() {
               onChange={(e) => {
                 setSelectedApartmentId(e.target.value);
                 setPeriodOffset(0);
+                setSelectedPlatform('');
               }}
               className="select"
             >
@@ -412,9 +409,9 @@ export default function ReportsPage() {
               className="select"
             >
               <option value="">All Platforms</option>
-              {platforms.map((p) => (
-                <option key={p.id} value={p.name}>
-                  {p.name}
+              {(apartmentReport?.availablePlatforms || []).map((name) => (
+                <option key={name} value={name}>
+                  {name}
                 </option>
               ))}
             </select>
@@ -505,11 +502,11 @@ export default function ReportsPage() {
                     value={`${apartmentReport.avgLengthOfStay.toFixed(1)} nights`}
                   />
                   <ReportKpiCard
-                    label="ADR"
+                    label="Average Daily Rate"
                     value={formatCurrency(apartmentReport.adr)}
                   />
                   <ReportKpiCard
-                    label="RevPAR"
+                    label="Revenue per Available Night"
                     value={formatCurrency(apartmentReport.revPar)}
                   />
                   <ReportKpiCard
