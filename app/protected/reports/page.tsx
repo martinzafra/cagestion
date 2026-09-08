@@ -261,7 +261,7 @@ export default function ReportsPage() {
         .select(
           'id, check_in_date, check_out_date, owners_booking, cleaning_charge, platform:inventory_platforms(name)'
         )
-        .in('status', ['CONFIRMED', 'DONE', 'FINISHED'])
+        .in('status', ['CONFIRMED', 'DONE', 'FINISHED', 'CANCELLED'])
         .lte('check_in_date', elapsedEnd)
         .gt('check_out_date', start);
       if (!isAggregate) bookingsQuery = bookingsQuery.eq('apartment_id', selectedApartmentId);
@@ -341,10 +341,11 @@ export default function ReportsPage() {
       let expenses: any[] = expensesRes.data || [];
 
       // Revenue/expenses tied to a booking outside the current valid set -
-      // e.g. one that's since been CANCELLED, or (when a platform is
-      // selected) booked on a different platform - shouldn't count. A
-      // general entry with no booking_id is apartment-level and always
-      // counts.
+      // e.g. one that's PENDING CONFIRMATION, or (when a platform is
+      // selected) booked on a different platform - shouldn't count.
+      // CANCELLED bookings still count: the guest was still charged and
+      // commission still applies. A general entry with no booking_id is
+      // apartment-level and always counts.
       revenue = revenue.filter((r) => !r.booking_id || filteredBookingIds.has(r.booking_id));
       expenses = expenses.filter((e) => !e.booking_id || filteredBookingIds.has(e.booking_id));
 
@@ -435,7 +436,7 @@ export default function ReportsPage() {
           platform:inventory_platforms(name),
           payment_type:inventory_payment_types(name)`
         )
-        .in('status', ['CONFIRMED', 'DONE', 'FINISHED'])
+        .in('status', ['CONFIRMED', 'DONE', 'FINISHED', 'CANCELLED'])
         .lte('check_in_date', elapsedEnd)
         .gt('check_out_date', start);
       if (!isAggregate) bookingsQuery = bookingsQuery.eq('apartment_id', selectedApartmentId);
