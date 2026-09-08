@@ -219,7 +219,7 @@ export default function ReportsPage() {
       if (error) throw error;
       const list = data || [];
       setApartments(list);
-      setSelectedApartmentId((prev) => prev || list.find((a) => a.active !== false)?.id || '');
+      setSelectedApartmentId((prev) => prev || 'ALL_ACTIVE');
     } catch (error) {
       toast.error('Failed to fetch apartments');
     }
@@ -227,13 +227,18 @@ export default function ReportsPage() {
 
   const fetchApartmentReport = async () => {
     const isAll = selectedApartmentId === 'ALL';
-    const apt = isAll ? null : apartments.find((a) => a.id === selectedApartmentId);
-    if (!isAll && !apt) return;
+    const isAllActive = selectedApartmentId === 'ALL_ACTIVE';
+    const isAggregate = isAll || isAllActive;
+    const apt = isAggregate ? null : apartments.find((a) => a.id === selectedApartmentId);
+    if (!isAggregate && !apt) return;
+
+    const activeApartments = apartments.filter((a) => a.active !== false);
+    const activeApartmentIds = activeApartments.map((a) => a.id);
 
     setReportLoading(true);
     try {
       const { start, end, usingCalendarFallback } = getPeriodBounds(
-        isAll ? null : apt!.contract_date,
+        isAggregate ? null : apt!.contract_date,
         periodOffset
       );
       const todayISO = new Date().toISOString().split('T')[0];
@@ -246,7 +251,8 @@ export default function ReportsPage() {
         .in('status', ['CONFIRMED', 'DONE', 'FINISHED'])
         .lte('check_in_date', elapsedEnd)
         .gte('check_out_date', start);
-      if (!isAll) bookingsQuery = bookingsQuery.eq('apartment_id', selectedApartmentId);
+      if (!isAggregate) bookingsQuery = bookingsQuery.eq('apartment_id', selectedApartmentId);
+      else if (isAllActive) bookingsQuery = bookingsQuery.in('apartment_id', activeApartmentIds);
 
       const bookingsRes = await bookingsQuery;
       if (bookingsRes.error) throw bookingsRes.error;
@@ -266,7 +272,8 @@ export default function ReportsPage() {
       // aggregating "All Apartments", since each one has that many nights on
       // offer independently.
       const elapsedDays = daysBetween(start, elapsedEnd);
-      const availableNights = elapsedDays * (isAll ? apartments.length : 1);
+      const availableNights =
+        elapsedDays * (isAll ? apartments.length : isAllActive ? activeApartments.length : 1);
       const occupancyRate = availableNights > 0 ? occupiedNights / availableNights : 0;
 
       // Only offer platforms that actually have a booking in this apartment/
@@ -302,14 +309,16 @@ export default function ReportsPage() {
         .select('total_services, amount, booking_id, item:inventory_invoice_items(name)')
         .gte('revenue_date', start)
         .lte('revenue_date', elapsedEnd);
-      if (!isAll) revenueQuery = revenueQuery.eq('apartment_id', selectedApartmentId);
+      if (!isAggregate) revenueQuery = revenueQuery.eq('apartment_id', selectedApartmentId);
+      else if (isAllActive) revenueQuery = revenueQuery.in('apartment_id', activeApartmentIds);
 
       let expensesQuery = supabase
         .from('expenses')
         .select('total, booking_id')
         .gte('expense_date', start)
         .lte('expense_date', elapsedEnd);
-      if (!isAll) expensesQuery = expensesQuery.eq('apartment_id', selectedApartmentId);
+      if (!isAggregate) expensesQuery = expensesQuery.eq('apartment_id', selectedApartmentId);
+      else if (isAllActive) expensesQuery = expensesQuery.in('apartment_id', activeApartmentIds);
 
       const [revenueRes, expensesRes] = await Promise.all([revenueQuery, expensesQuery]);
       if (revenueRes.error) throw revenueRes.error;
@@ -343,7 +352,7 @@ export default function ReportsPage() {
       const projectionFactor = isInProgress && elapsedDays > 0 ? totalDays / elapsedDays : 1;
 
       setApartmentReport({
-        apartmentName: isAll ? 'All Apartments' : apt!.name,
+        apartmentName: isAll ? 'All Apartments' : isAllActive ? 'All Active Apartments' : apt!.name,
         periodStart: start,
         periodEnd: end,
         isInProgress,
@@ -396,6 +405,7 @@ export default function ReportsPage() {
               }}
               className="select"
             >
+              <option value="ALL_ACTIVE">All Active Apartments</option>
               <option value="ALL">All Apartments</option>
               {apartments.map((apt) => (
                 <option key={apt.id} value={apt.id}>

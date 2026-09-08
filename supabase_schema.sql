@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS inventory_apartments (
   contract apartment_contract_type NOT NULL DEFAULT 'None',
   contract_date DATE,
   active BOOLEAN NOT NULL DEFAULT true,
+  end_date DATE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

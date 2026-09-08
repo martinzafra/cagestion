@@ -16,6 +16,7 @@ interface TabItem {
   contract?: 'None' | 'Yearly' | 'Unlimited';
   contract_date?: string | null;
   active?: boolean;
+  end_date?: string | null;
 }
 
 export default function InventoryPage() {
@@ -270,7 +271,7 @@ export default function InventoryPage() {
 
   const handleApartmentFieldChange = (
     id: string,
-    field: 'commission_percentage' | 'contract' | 'contract_date' | 'active',
+    field: 'commission_percentage' | 'contract' | 'contract_date' | 'active' | 'end_date',
     value: any
   ) => {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)));
@@ -452,6 +453,9 @@ export default function InventoryPage() {
                           onChange={(checked) => {
                             handleApartmentFieldChange(item.id, 'active', checked);
                             persistApartmentField(item.id, 'active', checked);
+                            const endDate = checked ? null : item.end_date || new Date().toISOString().split('T')[0];
+                            handleApartmentFieldChange(item.id, 'end_date', endDate);
+                            persistApartmentField(item.id, 'end_date', endDate);
                           }}
                           className="flex items-center gap-1.5 text-xs text-gray-500"
                         >
@@ -479,7 +483,11 @@ export default function InventoryPage() {
                 )}
               </div>
               {activeTab === 'apartments' && (
-                <div className="mt-3 pt-3 border-t grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div
+                  className={`mt-3 pt-3 border-t grid grid-cols-1 gap-2 ${
+                    item.active === false ? 'sm:grid-cols-4' : 'sm:grid-cols-3'
+                  }`}
+                >
                   <div>
                     <label className="text-xs text-gray-500">Commission %</label>
                     <input
@@ -533,6 +541,22 @@ export default function InventoryPage() {
                       className="input text-base sm:text-sm"
                     />
                   </div>
+                  {item.active === false && (
+                    <div>
+                      <label className="text-xs text-gray-500">End Date</label>
+                      <input
+                        type="date"
+                        value={item.end_date ?? ''}
+                        onChange={(e) =>
+                          handleApartmentFieldChange(item.id, 'end_date', e.target.value || null)
+                        }
+                        onBlur={(e) =>
+                          persistApartmentField(item.id, 'end_date', e.target.value || null)
+                        }
+                        className="input text-base sm:text-sm"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
               {activeTab === 'agents' && allUsers.length > 0 && (
