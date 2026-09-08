@@ -287,7 +287,8 @@ export default function RevenuePage() {
 
   // Mirrors revenue_invoicing's generated amount/amount_with_vat columns so
   // the form previews the total before it's saved.
-  const commissionAmount = formData.total_services * (formData.commission_percentage / 100);
+  const commissionAmount =
+    Math.round(formData.total_services * (formData.commission_percentage / 100) * 100) / 100;
   const totalAmount = Math.round((commissionAmount + (formData.vat || 0)) * 100) / 100;
 
   const SortableHeader: React.FC<{
@@ -432,7 +433,7 @@ export default function RevenuePage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
               <div>
                 <label className="label">Invoice Item *</label>
                 <select
@@ -480,6 +481,16 @@ export default function RevenuePage() {
                     })
                   }
                   className="input"
+                  step="0.01"
+                />
+              </div>
+              <div>
+                <label className="label">Subtotal € (calculated)</label>
+                <input
+                  type="number"
+                  value={commissionAmount}
+                  disabled
+                  className="input bg-gray-100 font-semibold"
                   step="0.01"
                 />
               </div>
