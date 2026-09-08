@@ -738,6 +738,12 @@ export default function ReportsPage() {
                         <p className="text-3xl font-bold text-gray-900 mt-1">
                           {apartmentReport.totalBookings}
                         </p>
+                        {apartmentReport.isInProgress && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            Projected (full year):{' '}
+                            {Math.round(apartmentReport.totalBookings * apartmentReport.projectionFactor)}
+                          </p>
+                        )}
                       </div>
                       <BarChart3 size={40} className="text-blue-600 opacity-20" />
                     </div>
@@ -750,6 +756,12 @@ export default function ReportsPage() {
                         <p className="text-3xl font-bold text-green-600 mt-1">
                           {formatCurrency(apartmentReport.totalRevenue)}
                         </p>
+                        {apartmentReport.isInProgress && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            Projected (full year):{' '}
+                            {formatCurrency(apartmentReport.totalRevenue * apartmentReport.projectionFactor)}
+                          </p>
+                        )}
                       </div>
                       <DollarSign size={40} className="text-green-600 opacity-20" />
                     </div>
@@ -762,6 +774,12 @@ export default function ReportsPage() {
                         <p className="text-3xl font-bold text-red-600 mt-1">
                           {formatCurrency(apartmentReport.totalExpenses)}
                         </p>
+                        {apartmentReport.isInProgress && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            Projected (full year):{' '}
+                            {formatCurrency(apartmentReport.totalExpenses * apartmentReport.projectionFactor)}
+                          </p>
+                        )}
                       </div>
                       <TrendingUp size={40} className="text-red-600 opacity-20" />
                     </div>
@@ -778,6 +796,12 @@ export default function ReportsPage() {
                         >
                           {formatCurrency(apartmentReport.netIncome)}
                         </p>
+                        {apartmentReport.isInProgress && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            Projected (full year):{' '}
+                            {formatCurrency(apartmentReport.netIncome * apartmentReport.projectionFactor)}
+                          </p>
+                        )}
                       </div>
                       <BarChart3 size={40} className="text-gray-600 opacity-20" />
                     </div>
@@ -805,36 +829,6 @@ export default function ReportsPage() {
                   <ReportKpiCard
                     label="Revenue per Available Night"
                     value={formatCurrency(apartmentReport.revPar)}
-                  />
-                  <ReportKpiCard
-                    label="Total Revenue"
-                    value={formatCurrency(apartmentReport.totalRevenue)}
-                    projected={
-                      apartmentReport.isInProgress
-                        ? formatCurrency(apartmentReport.totalRevenue * apartmentReport.projectionFactor)
-                        : undefined
-                    }
-                    valueClassName="text-green-600"
-                  />
-                  <ReportKpiCard
-                    label="Total Expenses"
-                    value={formatCurrency(apartmentReport.totalExpenses)}
-                    projected={
-                      apartmentReport.isInProgress
-                        ? formatCurrency(apartmentReport.totalExpenses * apartmentReport.projectionFactor)
-                        : undefined
-                    }
-                    valueClassName="text-red-600"
-                  />
-                  <ReportKpiCard
-                    label="Net Income"
-                    value={formatCurrency(apartmentReport.netIncome)}
-                    projected={
-                      apartmentReport.isInProgress
-                        ? formatCurrency(apartmentReport.netIncome * apartmentReport.projectionFactor)
-                        : undefined
-                    }
-                    valueClassName={apartmentReport.netIncome >= 0 ? 'text-green-600' : 'text-red-600'}
                   />
                 </div>
 
