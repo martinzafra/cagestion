@@ -463,7 +463,7 @@ export default function ReportsPage() {
           .in('booking_id', bookingIds),
         supabase
           .from('expenses')
-          .select('total, booking_id, category:inventory_expense_types(name)')
+          .select('amount, booking_id, category:inventory_expense_types(name)')
           .in('booking_id', bookingIds),
       ]);
       if (revenueRes.error) throw revenueRes.error;
@@ -484,23 +484,29 @@ export default function ReportsPage() {
 
       const expensesByBooking: Record<
         string,
-        { cleaning: number; laundry: number; other: number; supplies: number }
+        { cleaning: number; laundry: number; other: number; supplies: number; platformInvoice: number }
       > = {};
       (expensesRes.data || []).forEach((e: any) => {
         if (!e.booking_id) return;
         const entry =
-          expensesByBooking[e.booking_id] || { cleaning: 0, laundry: 0, other: 0, supplies: 0 };
+          expensesByBooking[e.booking_id] ||
+          { cleaning: 0, laundry: 0, other: 0, supplies: 0, platformInvoice: 0 };
         const categoryName = e.category?.name;
-        if (categoryName === 'Cleaning') entry.cleaning += e.total || 0;
-        else if (categoryName === 'Laundry') entry.laundry += e.total || 0;
-        else if (categoryName === 'Other') entry.other += e.total || 0;
-        else if (categoryName === 'Supplies') entry.supplies += e.total || 0;
+        // Every exported amount is net of VAT (expenses.amount), never
+        // expenses.total.
+        if (categoryName === 'Cleaning') entry.cleaning += e.amount || 0;
+        else if (categoryName === 'Laundry') entry.laundry += e.amount || 0;
+        else if (categoryName === 'Other') entry.other += e.amount || 0;
+        else if (categoryName === 'Supplies') entry.supplies += e.amount || 0;
+        else if (categoryName === 'Platform Invoice') entry.platformInvoice += e.amount || 0;
         expensesByBooking[e.booking_id] = entry;
       });
 
       const rows = bookings.map((b) => {
         const rev = revenueByBooking[b.id] || { invoice: 0, collection: 0, commission: 0 };
-        const exp = expensesByBooking[b.id] || { cleaning: 0, laundry: 0, other: 0, supplies: 0 };
+        const exp =
+          expensesByBooking[b.id] ||
+          { cleaning: 0, laundry: 0, other: 0, supplies: 0, platformInvoice: 0 };
         return {
           ...b,
           _revenueInvoice: rev.invoice,
@@ -510,6 +516,7 @@ export default function ReportsPage() {
           _expLaundry: exp.laundry,
           _expOther: exp.other,
           _expSupplies: exp.supplies,
+          _expPlatformInvoice: exp.platformInvoice,
           _caOther: (b.cleaning_charge || 0) - (exp.cleaning + exp.laundry),
         };
       });
@@ -554,6 +561,7 @@ export default function ReportsPage() {
         { header: 'Exp Laundry', value: (b) => b._expLaundry },
         { header: 'Exp Other', value: (b) => b._expOther },
         { header: 'Exp Supplies', value: (b) => b._expSupplies },
+        { header: 'Exp Platform Invoice', value: (b) => b._expPlatformInvoice },
         { header: 'CA Other', value: (b) => b._caOther },
       ]);
     } catch (error) {
