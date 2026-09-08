@@ -2,9 +2,92 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { BarChart3, TrendingUp, DollarSign } from 'lucide-react';
+import { BarChart3, TrendingUp, DollarSign, ChevronLeft, ChevronRight, BedDouble } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatCurrency, formatDate } from '@/lib/calculations';
+
+// ---- Apartment Annual Report -----------------------------------------
+// The report year runs from the apartment's contract anniversary date, not
+// the calendar year (e.g. a contract signed 15 Mar runs 15 Mar - 14 Mar).
+// Apartments with no contract date fall back to the plain calendar year.
+
+function daysBetween(startISO: string, endISO: string): number {
+  const [sy, sm, sd] = startISO.split('-').map(Number);
+  const [ey, em, ed] = endISO.split('-').map(Number);
+  const start = Date.UTC(sy, sm - 1, sd);
+  const end = Date.UTC(ey, em - 1, ed);
+  return Math.round((end - start) / 86400000);
+}
+
+function getPeriodBounds(
+  contractDate: string | null,
+  offset: number
+): { start: string; end: string; usingCalendarFallback: boolean } {
+  const todayISO = new Date().toISOString().split('T')[0];
+  const [ty, tm, td] = todayISO.split('-').map(Number);
+
+  if (!contractDate) {
+    const year = ty + offset;
+    return { start: `${year}-01-01`, end: `${year}-12-31`, usingCalendarFallback: true };
+  }
+
+  const [, cm, cd] = contractDate.split('-').map(Number);
+  // Anchor year of the CURRENT period (offset 0): the most recent
+  // anniversary on or before today.
+  let anchorYear = ty;
+  const anniversaryReached = tm > cm || (tm === cm && td >= cd);
+  if (!anniversaryReached) anchorYear -= 1;
+  anchorYear += offset;
+
+  const start = `${anchorYear}-${String(cm).padStart(2, '0')}-${String(cd).padStart(2, '0')}`;
+  const endDateUTC = new Date(Date.UTC(anchorYear + 1, cm - 1, cd - 1));
+  const end = endDateUTC.toISOString().split('T')[0];
+  return { start, end, usingCalendarFallback: false };
+}
+
+interface ApartmentReportData {
+  apartmentName: string;
+  periodStart: string;
+  periodEnd: string;
+  isInProgress: boolean;
+  usingCalendarFallback: boolean;
+  pctComplete: number;
+  occupancyRate: number;
+  occupiedNights: number;
+  availableNights: number;
+  totalBookings: number;
+  avgLengthOfStay: number;
+  grossRevenue: number;
+  commission: number;
+  totalExpenses: number;
+  netIncome: number;
+  adr: number;
+  revPar: number;
+  projectionFactor: number;
+  platformCounts: Record<string, number>;
+}
+
+function ReportKpiCard({
+  label,
+  value,
+  projected,
+  valueClassName = 'text-gray-900',
+}: {
+  label: string;
+  value: string;
+  projected?: string;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className={`text-xl font-bold mt-0.5 ${valueClassName}`}>{value}</p>
+      {projected && (
+        <p className="text-xs text-gray-400 mt-1">Projected (full year): {projected}</p>
+      )}
+    </div>
+  );
+}
 
 export default function ReportsPage() {
   const [userRole, setUserRole] = useState<string>('');
@@ -25,6 +108,12 @@ export default function ReportsPage() {
 
   const [loading, setLoading] = useState(true);
 
+  const [apartments, setApartments] = useState<any[]>([]);
+  const [selectedApartmentId, setSelectedApartmentId] = useState('');
+  const [periodOffset, setPeriodOffset] = useState(0);
+  const [apartmentReport, setApartmentReport] = useState<ApartmentReportData | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+
   useEffect(() => {
     checkAuth();
   }, []);
@@ -34,6 +123,20 @@ export default function ReportsPage() {
       fetchStats();
     }
   }, [dateRange, userRole]);
+
+  useEffect(() => {
+    if (userRole) {
+      fetchApartments();
+    }
+  }, [userRole]);
+
+  useEffect(() => {
+    if (selectedApartmentId) {
+      fetchApartmentReport();
+    } else {
+      setApartmentReport(null);
+    }
+  }, [selectedApartmentId, periodOffset]);
 
   const checkAuth = async () => {
     try {
@@ -105,6 +208,122 @@ export default function ReportsPage() {
     }
   };
 
+  const fetchApartments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('inventory_apartments')
+        .select('id, name, contract, contract_date, active')
+        .order('name');
+      if (error) throw error;
+      const list = data || [];
+      setApartments(list);
+      setSelectedApartmentId((prev) => prev || list.find((a) => a.active !== false)?.id || '');
+    } catch (error) {
+      toast.error('Failed to fetch apartments');
+    }
+  };
+
+  const fetchApartmentReport = async () => {
+    const apt = apartments.find((a) => a.id === selectedApartmentId);
+    if (!apt) return;
+
+    setReportLoading(true);
+    try {
+      const { start, end, usingCalendarFallback } = getPeriodBounds(apt.contract_date, periodOffset);
+      const todayISO = new Date().toISOString().split('T')[0];
+      const isInProgress = todayISO < end;
+      const elapsedEnd = isInProgress ? todayISO : end;
+
+      const [bookingsRes, revenueRes, expensesRes] = await Promise.all([
+        supabase
+          .from('bookings')
+          .select('id, check_in_date, check_out_date, owners_booking, platform:inventory_platforms(name)')
+          .eq('apartment_id', selectedApartmentId)
+          .in('status', ['CONFIRMED', 'DONE', 'FINISHED'])
+          .lte('check_in_date', elapsedEnd)
+          .gte('check_out_date', start),
+        supabase
+          .from('revenue_invoicing')
+          .select('total_services, amount, item:inventory_invoice_items(name)')
+          .eq('apartment_id', selectedApartmentId)
+          .gte('revenue_date', start)
+          .lte('revenue_date', elapsedEnd),
+        supabase
+          .from('expenses')
+          .select('total')
+          .eq('apartment_id', selectedApartmentId)
+          .gte('expense_date', start)
+          .lte('expense_date', elapsedEnd),
+      ]);
+
+      if (bookingsRes.error) throw bookingsRes.error;
+      if (revenueRes.error) throw revenueRes.error;
+      if (expensesRes.error) throw expensesRes.error;
+
+      const bookings = bookingsRes.data || [];
+      const revenue: any[] = revenueRes.data || [];
+      const expenses = expensesRes.data || [];
+
+      let occupiedNights = 0;
+      let revenueNights = 0; // excludes owner-use nights - their rate is 0
+      const platformCounts: Record<string, number> = {};
+
+      bookings.forEach((b: any) => {
+        const overlapStart = b.check_in_date > start ? b.check_in_date : start;
+        const overlapEnd = b.check_out_date < elapsedEnd ? b.check_out_date : elapsedEnd;
+        const nights = daysBetween(overlapStart, overlapEnd);
+        if (nights > 0) {
+          occupiedNights += nights;
+          if (!b.owners_booking) revenueNights += nights;
+        }
+        const platformName = b.platform?.name || 'Other';
+        platformCounts[platformName] = (platformCounts[platformName] || 0) + 1;
+      });
+
+      const availableNights = daysBetween(start, elapsedEnd);
+      const occupancyRate = availableNights > 0 ? occupiedNights / availableNights : 0;
+
+      const grossRevenue = revenue.reduce((sum, r) => sum + (r.total_services || 0), 0);
+      const commission = revenue
+        .filter((r) => r.item?.name === 'Commission')
+        .reduce((sum, r) => sum + (r.amount || 0), 0);
+      const totalExpenses = expenses.reduce((sum, e) => sum + (e.total || 0), 0);
+      const netIncome = grossRevenue - commission - totalExpenses;
+      const adr = revenueNights > 0 ? grossRevenue / revenueNights : 0;
+      const revPar = availableNights > 0 ? grossRevenue / availableNights : 0;
+      const avgLengthOfStay = bookings.length > 0 ? occupiedNights / bookings.length : 0;
+
+      const totalDays = daysBetween(start, end);
+      const projectionFactor = isInProgress && availableNights > 0 ? totalDays / availableNights : 1;
+
+      setApartmentReport({
+        apartmentName: apt.name,
+        periodStart: start,
+        periodEnd: end,
+        isInProgress,
+        usingCalendarFallback,
+        pctComplete: totalDays > 0 ? Math.min(100, Math.round((availableNights / totalDays) * 100)) : 100,
+        occupancyRate,
+        occupiedNights,
+        availableNights,
+        totalBookings: bookings.length,
+        avgLengthOfStay,
+        grossRevenue,
+        commission,
+        totalExpenses,
+        netIncome,
+        adr,
+        revPar,
+        projectionFactor,
+        platformCounts,
+      });
+    } catch (error) {
+      toast.error('Failed to load apartment report');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
   if (userRole !== 'admin') {
     return null;
   }
@@ -114,6 +333,180 @@ export default function ReportsPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
         <p className="text-gray-600 mt-1">Property management insights and statistics</p>
+      </div>
+
+      {/* Apartment Annual Report */}
+      <div className="card">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+          <h2 className="text-xl font-bold text-gray-900">Apartment Annual Report</h2>
+          <div className="flex items-center gap-3">
+            <select
+              value={selectedApartmentId}
+              onChange={(e) => {
+                setSelectedApartmentId(e.target.value);
+                setPeriodOffset(0);
+              }}
+              className="select"
+            >
+              {apartments.map((apt) => (
+                <option key={apt.id} value={apt.id}>
+                  {apt.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {apartmentReport && (
+          <>
+            <div className="flex flex-wrap items-center gap-3 mb-6 pb-4 border-b">
+              <button
+                onClick={() => setPeriodOffset((p) => p - 1)}
+                className="p-2 hover:bg-gray-100 rounded"
+                title="Previous period"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <div className="text-sm font-medium text-gray-900">
+                {formatDate(apartmentReport.periodStart)} &ndash; {formatDate(apartmentReport.periodEnd)}
+              </div>
+              <button
+                onClick={() => setPeriodOffset((p) => p + 1)}
+                className="p-2 hover:bg-gray-100 rounded"
+                title="Next period"
+                disabled={periodOffset >= 0 && !apartmentReport.isInProgress}
+              >
+                <ChevronRight size={18} />
+              </button>
+              {apartmentReport.isInProgress ? (
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  In progress &mdash; {apartmentReport.pctComplete}% through period
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-700">
+                  Completed
+                </span>
+              )}
+              {apartmentReport.usingCalendarFallback && (
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                  No contract date set &mdash; showing calendar year
+                </span>
+              )}
+              {periodOffset !== 0 && (
+                <button
+                  onClick={() => setPeriodOffset(0)}
+                  className="text-sm text-blue-600 hover:underline ml-auto"
+                >
+                  Back to current period
+                </button>
+              )}
+            </div>
+
+            {reportLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <>
+                {/* Occupancy - headline KPI */}
+                <div className="mb-6 p-5 rounded-2xl bg-blue-50 flex items-center gap-5">
+                  <BedDouble size={44} className="text-blue-600 opacity-40 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm text-gray-600">
+                      Occupancy Rate
+                      {apartmentReport.isInProgress && ' (to date)'}
+                    </p>
+                    <p className="text-4xl font-bold text-blue-700">
+                      {(apartmentReport.occupancyRate * 100).toFixed(1)}%
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {apartmentReport.occupiedNights} of {apartmentReport.availableNights} nights booked
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+                  <ReportKpiCard
+                    label="Total Bookings"
+                    value={apartmentReport.totalBookings.toString()}
+                    projected={
+                      apartmentReport.isInProgress
+                        ? Math.round(apartmentReport.totalBookings * apartmentReport.projectionFactor).toString()
+                        : undefined
+                    }
+                  />
+                  <ReportKpiCard
+                    label="Avg. Length of Stay"
+                    value={`${apartmentReport.avgLengthOfStay.toFixed(1)} nights`}
+                  />
+                  <ReportKpiCard
+                    label="ADR"
+                    value={formatCurrency(apartmentReport.adr)}
+                  />
+                  <ReportKpiCard
+                    label="RevPAR"
+                    value={formatCurrency(apartmentReport.revPar)}
+                  />
+                  <ReportKpiCard
+                    label="Gross Revenue"
+                    value={formatCurrency(apartmentReport.grossRevenue)}
+                    projected={
+                      apartmentReport.isInProgress
+                        ? formatCurrency(apartmentReport.grossRevenue * apartmentReport.projectionFactor)
+                        : undefined
+                    }
+                    valueClassName="text-green-600"
+                  />
+                  <ReportKpiCard
+                    label="Commission"
+                    value={formatCurrency(apartmentReport.commission)}
+                    projected={
+                      apartmentReport.isInProgress
+                        ? formatCurrency(apartmentReport.commission * apartmentReport.projectionFactor)
+                        : undefined
+                    }
+                  />
+                  <ReportKpiCard
+                    label="Total Expenses"
+                    value={formatCurrency(apartmentReport.totalExpenses)}
+                    projected={
+                      apartmentReport.isInProgress
+                        ? formatCurrency(apartmentReport.totalExpenses * apartmentReport.projectionFactor)
+                        : undefined
+                    }
+                    valueClassName="text-red-600"
+                  />
+                  <ReportKpiCard
+                    label="Net Income"
+                    value={formatCurrency(apartmentReport.netIncome)}
+                    projected={
+                      apartmentReport.isInProgress
+                        ? formatCurrency(apartmentReport.netIncome * apartmentReport.projectionFactor)
+                        : undefined
+                    }
+                    valueClassName={apartmentReport.netIncome >= 0 ? 'text-green-600' : 'text-red-600'}
+                  />
+                </div>
+
+                {Object.keys(apartmentReport.platformCounts).length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Bookings by Platform</p>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(apartmentReport.platformCounts).map(([name, count]) => (
+                        <span
+                          key={name}
+                          className="px-3 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-800"
+                        >
+                          {name}: {count}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
       </div>
 
       {/* Date Range Filter */}
