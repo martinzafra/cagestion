@@ -530,7 +530,7 @@ export default function ReportsPage() {
                     valueClassName="text-green-600"
                   />
                   <ReportKpiCard
-                    label="Commission"
+                    label="CA Commission"
                     value={formatCurrency(apartmentReport.commission)}
                     projected={
                       apartmentReport.isInProgress
