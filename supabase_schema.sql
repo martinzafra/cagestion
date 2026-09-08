@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS inventory_platforms (
 
 CREATE TABLE IF NOT EXISTS inventory_expense_types (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name TEXT UNIQUE NOT NULL, -- 'Cleaning', 'Laundry', 'Supplies', 'Tax', 'Other'
+  name TEXT UNIQUE NOT NULL, -- 'Cleaning', 'Laundry', 'Supplies', 'Tax', 'Other', 'Platform Invoice'
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
