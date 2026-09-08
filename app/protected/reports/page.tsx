@@ -261,7 +261,7 @@ export default function ReportsPage() {
         .select(
           'id, check_in_date, check_out_date, owners_booking, cleaning_charge, platform:inventory_platforms(name)'
         )
-        .in('status', ['CONFIRMED', 'DONE', 'FINISHED', 'CANCELLED'])
+        .in('status', ['FINISHED', 'CANCELLED'])
         .lte('check_in_date', elapsedEnd)
         .gt('check_out_date', start);
       if (!isAggregate) bookingsQuery = bookingsQuery.eq('apartment_id', selectedApartmentId);
@@ -327,7 +327,7 @@ export default function ReportsPage() {
 
       let expensesQuery = supabase
         .from('expenses')
-        .select('total, booking_id, category:inventory_expense_types(name)')
+        .select('total, amount, booking_id, category:inventory_expense_types(name)')
         .gte('expense_date', start)
         .lte('expense_date', elapsedEnd);
       if (!isAggregate) expensesQuery = expensesQuery.eq('apartment_id', selectedApartmentId);
@@ -341,11 +341,11 @@ export default function ReportsPage() {
       let expenses: any[] = expensesRes.data || [];
 
       // Revenue/expenses tied to a booking outside the current valid set -
-      // e.g. one that's PENDING CONFIRMATION, or (when a platform is
-      // selected) booked on a different platform - shouldn't count.
-      // CANCELLED bookings still count: the guest was still charged and
-      // commission still applies. A general entry with no booking_id is
-      // apartment-level and always counts.
+      // e.g. one that's still PENDING/CONFIRMED/DONE and not yet finalized,
+      // or (when a platform is selected) booked on a different platform -
+      // shouldn't count. CANCELLED bookings still count: the guest was
+      // still charged and commission still applies. A general entry with
+      // no booking_id is apartment-level and always counts.
       revenue = revenue.filter((r) => !r.booking_id || filteredBookingIds.has(r.booking_id));
       expenses = expenses.filter((e) => !e.booking_id || filteredBookingIds.has(e.booking_id));
 
@@ -355,7 +355,8 @@ export default function ReportsPage() {
         .reduce((sum, r) => sum + (r.amount || 0), 0);
       // CA Other: the margin between what guests were charged for
       // cleaning and what was actually paid out for Cleaning/Laundry on
-      // those same bookings.
+      // those same bookings. Net of VAT (expenses.amount), matching the
+      // Bookings Report export.
       const cleaningChargeTotal = filteredBookings.reduce((sum, b) => sum + (b.cleaning_charge || 0), 0);
       const cleaningLaundryExpenses = expenses
         .filter(
@@ -364,7 +365,7 @@ export default function ReportsPage() {
             filteredBookingIds.has(e.booking_id) &&
             ['Cleaning', 'Laundry'].includes(e.category?.name)
         )
-        .reduce((sum, e) => sum + (e.total || 0), 0);
+        .reduce((sum, e) => sum + (e.amount || 0), 0);
       const caOther = cleaningChargeTotal - cleaningLaundryExpenses;
       const totalExpenses = expenses.reduce((sum, e) => sum + (e.total || 0), 0);
       const netIncome = grossRevenue - commission - totalExpenses;
@@ -436,7 +437,7 @@ export default function ReportsPage() {
           platform:inventory_platforms(name),
           payment_type:inventory_payment_types(name)`
         )
-        .in('status', ['CONFIRMED', 'DONE', 'FINISHED', 'CANCELLED'])
+        .in('status', ['FINISHED', 'CANCELLED'])
         .lte('check_in_date', elapsedEnd)
         .gt('check_out_date', start);
       if (!isAggregate) bookingsQuery = bookingsQuery.eq('apartment_id', selectedApartmentId);
@@ -463,7 +464,7 @@ export default function ReportsPage() {
           .in('booking_id', bookingIds),
         supabase
           .from('expenses')
-          .select('amount, booking_id, category:inventory_expense_types(name)')
+          .select('amount, total, booking_id, category:inventory_expense_types(name)')
           .in('booking_id', bookingIds),
       ]);
       if (revenueRes.error) throw revenueRes.error;
@@ -484,21 +485,31 @@ export default function ReportsPage() {
 
       const expensesByBooking: Record<
         string,
-        { cleaning: number; laundry: number; other: number; supplies: number; platformInvoice: number }
+        {
+          cleaning: number;
+          laundry: number;
+          other: number;
+          supplies: number;
+          platformInvoiceNoVat: number;
+          platformInvoiceVat: number;
+        }
       > = {};
       (expensesRes.data || []).forEach((e: any) => {
         if (!e.booking_id) return;
         const entry =
           expensesByBooking[e.booking_id] ||
-          { cleaning: 0, laundry: 0, other: 0, supplies: 0, platformInvoice: 0 };
+          { cleaning: 0, laundry: 0, other: 0, supplies: 0, platformInvoiceNoVat: 0, platformInvoiceVat: 0 };
         const categoryName = e.category?.name;
         // Every exported amount is net of VAT (expenses.amount), never
-        // expenses.total.
+        // expenses.total - except Platform Invoice, which gets both.
         if (categoryName === 'Cleaning') entry.cleaning += e.amount || 0;
         else if (categoryName === 'Laundry') entry.laundry += e.amount || 0;
         else if (categoryName === 'Other') entry.other += e.amount || 0;
         else if (categoryName === 'Supplies') entry.supplies += e.amount || 0;
-        else if (categoryName === 'Platform Invoice') entry.platformInvoice += e.amount || 0;
+        else if (categoryName === 'Platform Invoice') {
+          entry.platformInvoiceNoVat += e.amount || 0;
+          entry.platformInvoiceVat += e.total || 0;
+        }
         expensesByBooking[e.booking_id] = entry;
       });
 
@@ -506,7 +517,7 @@ export default function ReportsPage() {
         const rev = revenueByBooking[b.id] || { invoice: 0, collection: 0, commission: 0 };
         const exp =
           expensesByBooking[b.id] ||
-          { cleaning: 0, laundry: 0, other: 0, supplies: 0, platformInvoice: 0 };
+          { cleaning: 0, laundry: 0, other: 0, supplies: 0, platformInvoiceNoVat: 0, platformInvoiceVat: 0 };
         return {
           ...b,
           _revenueInvoice: rev.invoice,
@@ -516,7 +527,8 @@ export default function ReportsPage() {
           _expLaundry: exp.laundry,
           _expOther: exp.other,
           _expSupplies: exp.supplies,
-          _expPlatformInvoice: exp.platformInvoice,
+          _expPlatformInvoiceNoVat: exp.platformInvoiceNoVat,
+          _expPlatformInvoiceVat: exp.platformInvoiceVat,
           _caOther: (b.cleaning_charge || 0) - (exp.cleaning + exp.laundry),
         };
       });
@@ -561,7 +573,8 @@ export default function ReportsPage() {
         { header: 'Exp Laundry', value: (b) => b._expLaundry },
         { header: 'Exp Other', value: (b) => b._expOther },
         { header: 'Exp Supplies', value: (b) => b._expSupplies },
-        { header: 'Exp Platform Invoice', value: (b) => b._expPlatformInvoice },
+        { header: 'Exp Platform Invoice (No VAT)', value: (b) => b._expPlatformInvoiceNoVat },
+        { header: 'Exp Platform Invoice (VAT)', value: (b) => b._expPlatformInvoiceVat },
         { header: 'CA Other', value: (b) => b._caOther },
       ]);
     } catch (error) {
