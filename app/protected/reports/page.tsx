@@ -482,13 +482,15 @@ export default function ReportsPage() {
 
       const expensesByBooking: Record<
         string,
-        { cleanLaundry: number; other: number; supplies: number }
+        { cleaning: number; laundry: number; other: number; supplies: number }
       > = {};
       (expensesRes.data || []).forEach((e: any) => {
         if (!e.booking_id) return;
-        const entry = expensesByBooking[e.booking_id] || { cleanLaundry: 0, other: 0, supplies: 0 };
+        const entry =
+          expensesByBooking[e.booking_id] || { cleaning: 0, laundry: 0, other: 0, supplies: 0 };
         const categoryName = e.category?.name;
-        if (categoryName === 'Cleaning' || categoryName === 'Laundry') entry.cleanLaundry += e.total || 0;
+        if (categoryName === 'Cleaning') entry.cleaning += e.total || 0;
+        else if (categoryName === 'Laundry') entry.laundry += e.total || 0;
         else if (categoryName === 'Other') entry.other += e.total || 0;
         else if (categoryName === 'Supplies') entry.supplies += e.total || 0;
         expensesByBooking[e.booking_id] = entry;
@@ -496,16 +498,17 @@ export default function ReportsPage() {
 
       const rows = bookings.map((b) => {
         const rev = revenueByBooking[b.id] || { invoice: 0, collection: 0, commission: 0 };
-        const exp = expensesByBooking[b.id] || { cleanLaundry: 0, other: 0, supplies: 0 };
+        const exp = expensesByBooking[b.id] || { cleaning: 0, laundry: 0, other: 0, supplies: 0 };
         return {
           ...b,
           _revenueInvoice: rev.invoice,
           _revenueCollection: rev.collection,
           _caCommission: rev.commission,
-          _expCleanLaundry: exp.cleanLaundry,
+          _expCleaning: exp.cleaning,
+          _expLaundry: exp.laundry,
           _expOther: exp.other,
           _expSupplies: exp.supplies,
-          _caOther: (b.cleaning_charge || 0) - exp.cleanLaundry,
+          _caOther: (b.cleaning_charge || 0) - (exp.cleaning + exp.laundry),
         };
       });
 
@@ -520,12 +523,8 @@ export default function ReportsPage() {
         { header: 'Apartment', value: (b) => b.apartment?.name },
         { header: 'Platform', value: (b) => b.platform?.name },
         { header: 'Guest Name', value: (b) => b.guest_name },
-        { header: 'Guest Phone', value: (b) => b.guest_phone },
-        { header: 'Guest Email', value: (b) => b.guest_email },
         { header: 'Check-in Date', value: (b) => b.check_in_date },
-        { header: 'Check-in Time', value: (b) => b.check_in_time },
         { header: 'Check-out Date', value: (b) => b.check_out_date },
-        { header: 'Check-out Time', value: (b) => b.check_out_time },
         { header: 'Nights', value: (b) => b.nights },
         { header: 'Number of Guests', value: (b) => b.number_of_guests },
         { header: 'Deposit', value: (b) => b.deposit },
@@ -549,7 +548,8 @@ export default function ReportsPage() {
         { header: 'Revenue Invoice', value: (b) => b._revenueInvoice },
         { header: 'Revenue Collection', value: (b) => b._revenueCollection },
         { header: 'CA Commission', value: (b) => b._caCommission },
-        { header: 'Exp Clean&Laundry', value: (b) => b._expCleanLaundry },
+        { header: 'Exp Cleaning', value: (b) => b._expCleaning },
+        { header: 'Exp Laundry', value: (b) => b._expLaundry },
         { header: 'Exp Other', value: (b) => b._expOther },
         { header: 'Exp Supplies', value: (b) => b._expSupplies },
         { header: 'CA Other', value: (b) => b._caOther },
