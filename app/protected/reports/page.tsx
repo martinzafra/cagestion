@@ -817,24 +817,6 @@ export default function ReportsPage() {
                     valueClassName="text-green-600"
                   />
                   <ReportKpiCard
-                    label="CA Commission"
-                    value={formatCurrency(apartmentReport.commission)}
-                    projected={
-                      apartmentReport.isInProgress
-                        ? formatCurrency(apartmentReport.commission * apartmentReport.projectionFactor)
-                        : undefined
-                    }
-                  />
-                  <ReportKpiCard
-                    label="CA Other"
-                    value={formatCurrency(apartmentReport.caOther)}
-                    projected={
-                      apartmentReport.isInProgress
-                        ? formatCurrency(apartmentReport.caOther * apartmentReport.projectionFactor)
-                        : undefined
-                    }
-                  />
-                  <ReportKpiCard
                     label="Total Expenses"
                     value={formatCurrency(apartmentReport.totalExpenses)}
                     projected={
@@ -853,6 +835,39 @@ export default function ReportsPage() {
                         : undefined
                     }
                     valueClassName={apartmentReport.netIncome >= 0 ? 'text-green-600' : 'text-red-600'}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                  <ReportKpiCard
+                    label="CA TOTAL"
+                    value={formatCurrency(apartmentReport.commission + apartmentReport.caOther)}
+                    projected={
+                      apartmentReport.isInProgress
+                        ? formatCurrency(
+                            (apartmentReport.commission + apartmentReport.caOther) *
+                              apartmentReport.projectionFactor
+                          )
+                        : undefined
+                    }
+                  />
+                  <ReportKpiCard
+                    label="CA Commission"
+                    value={formatCurrency(apartmentReport.commission)}
+                    projected={
+                      apartmentReport.isInProgress
+                        ? formatCurrency(apartmentReport.commission * apartmentReport.projectionFactor)
+                        : undefined
+                    }
+                  />
+                  <ReportKpiCard
+                    label="CA Other"
+                    value={formatCurrency(apartmentReport.caOther)}
+                    projected={
+                      apartmentReport.isInProgress
+                        ? formatCurrency(apartmentReport.caOther * apartmentReport.projectionFactor)
+                        : undefined
+                    }
                   />
                 </div>
 
