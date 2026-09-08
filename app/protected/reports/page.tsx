@@ -529,6 +529,7 @@ export default function ReportsPage() {
           _expSupplies: exp.supplies,
           _expPlatformInvoiceNoVat: exp.platformInvoiceNoVat,
           _expPlatformInvoiceVat: exp.platformInvoiceVat,
+          _caVat: exp.platformInvoiceVat - exp.platformInvoiceNoVat,
           _caOther: (b.cleaning_charge || 0) - (exp.cleaning + exp.laundry),
         };
       });
@@ -575,6 +576,7 @@ export default function ReportsPage() {
         { header: 'Exp Supplies', value: (b) => b._expSupplies },
         { header: 'Exp Platform Invoice (No VAT)', value: (b) => b._expPlatformInvoiceNoVat },
         { header: 'Exp Platform Invoice (VAT)', value: (b) => b._expPlatformInvoiceVat },
+        { header: 'CA VAT', value: (b) => b._caVat },
         { header: 'CA Other', value: (b) => b._caOther },
       ]);
     } catch (error) {
