@@ -48,16 +48,21 @@ const todayISO = () => new Date().toISOString().split('T')[0];
 // bg / dark-text-of-the-same-hue style as Pending/Confirmed's badges on
 // the Bookings screen.
 const WORKFLOW_PHASES: { key: string; label: string; bg: string; text: string }[] = [
-  { key: 'PENDING CONFIRMATION', label: 'PENDING', bg: '#FEF9C3', text: '#854D0E' },
+  { key: 'PENDING CONFIRMATION', label: 'TO BE CONFIRMED', bg: '#FEF9C3', text: '#854D0E' },
   { key: 'CONFIRMED', label: 'CONFIRMED', bg: '#DCFCE7', text: '#166534' },
-  { key: 'CHECK IN', label: 'CHECK IN', bg: '#CCFBF1', text: '#115E59' },
-  { key: 'CHECK OUT', label: 'CHECK OUT', bg: '#E0F2FE', text: '#075985' },
-  { key: 'TO INV/EXP', label: 'TO INV/EXP', bg: '#EEE9F4', text: '#582294' },
+  { key: 'CHECK IN', label: 'CHECKED IN', bg: '#CCFBF1', text: '#115E59' },
+  { key: 'CHECK OUT', label: 'CHECKED OUT', bg: '#E0F2FE', text: '#075985' },
+  { key: 'TO INV/EXP', label: 'TO DO INV/EXP', bg: '#EEE9F4', text: '#582294' },
   { key: 'COMPLETED', label: 'COMPLETED', bg: '#FAE6F5', text: '#7A1763' },
 ];
-// Keyed lookup for the grid's "To Do Status" badge and row tint.
+// Keyed lookups for the grid's "To Do Status" badge and row tint - key is
+// the internal status value (used for filtering/sorting), label is what's
+// actually displayed.
 const PHASE_STYLE: Record<string, { bg: string; text: string }> = Object.fromEntries(
   WORKFLOW_PHASES.map((p) => [p.key, { bg: p.bg, text: p.text }])
+);
+const PHASE_LABEL: Record<string, string> = Object.fromEntries(
+  WORKFLOW_PHASES.map((p) => [p.key, p.label])
 );
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -411,11 +416,11 @@ export default function TodoPage() {
             className="select"
           >
             <option value="">All To Do Status</option>
-            <option value="PENDING CONFIRMATION">Pending Confirmation</option>
+            <option value="PENDING CONFIRMATION">To Be Confirmed</option>
             <option value="CONFIRMED">Confirmed</option>
-            <option value="CHECK IN">Check In</option>
-            <option value="CHECK OUT">Check Out</option>
-            <option value="TO INV/EXP">To Inv/Exp</option>
+            <option value="CHECK IN">Checked In</option>
+            <option value="CHECK OUT">Checked Out</option>
+            <option value="TO INV/EXP">To Do Inv/Exp</option>
             <option value="COMPLETED">Completed</option>
           </select>
           <select
@@ -474,7 +479,7 @@ export default function TodoPage() {
               <col className="w-[220px]" />
               <col className="w-[75px]" />
               <col className="w-[80px]" />
-              <col className="w-[130px]" />
+              <col className="w-[165px]" />
               <col className="w-[150px]" />
               <col className="w-[150px]" />
               <col className="w-[150px]" />
@@ -527,7 +532,7 @@ export default function TodoPage() {
                               : undefined
                           }
                         >
-                          {todoStatus}
+                          {PHASE_LABEL[todoStatus] || todoStatus}
                         </span>
                       </td>
                       <td>

@@ -16,7 +16,7 @@ const STATUS_COLORS: Record<string, string> = {
 // Shorter text for display only - the underlying status value (used for
 // color lookup, filtering, and storage) is untouched.
 const STATUS_LABELS: Record<string, string> = {
-  'PENDING CONFIRMATION': 'PENDING',
+  'PENDING CONFIRMATION': 'TO BE CONFIRMED',
 };
 
 export default function StatusBadge({ status, wrap = false }: { status: string; wrap?: boolean }) {
