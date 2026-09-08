@@ -299,15 +299,17 @@ export default function RevenuePage() {
   const SortableHeader: React.FC<{
     column: SortColumn;
     children: React.ReactNode;
-    align?: 'left' | 'right';
+    align?: 'left' | 'right' | 'center';
   }> = ({ column, children, align = 'left' }) => (
     <th
       className={`cursor-pointer select-none hover:bg-gray-200 ${
-        align === 'right' ? 'text-right' : ''
+        align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : ''
       }`}
       onClick={() => handleSort(column)}
     >
-      <span className="inline-flex items-center gap-1">
+      <span
+        className={`inline-flex items-center gap-1 ${align === 'center' ? 'justify-center' : ''}`}
+      >
         {children}
         {sortColumn === column &&
           (sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
@@ -611,7 +613,21 @@ export default function RevenuePage() {
           </div>
 
           <div className="card overflow-x-auto">
-          <table className="table">
+          <table className="table [table-layout:fixed] w-full text-xs [&_th]:text-xs [&_th]:px-2 [&_th]:py-1.5 [&_td]:text-xs [&_td]:px-2 [&_td]:py-1.5">
+            <colgroup>
+              <col className="w-[95px]" />
+              <col className="w-[60px]" />
+              <col className="w-[72px]" />
+              <col className="w-[186px]" />
+              <col className="w-[82px]" />
+              <col className="w-[122px]" />
+              <col className="w-[78px]" />
+              <col className="w-[55px]" />
+              <col className="w-[70px]" />
+              <col className="w-[90px]" />
+              <col className="w-[78px]" />
+              <col className="w-[70px]" />
+            </colgroup>
             <thead>
               <tr>
                 <SortableHeader column="revenue_type">Type</SortableHeader>
@@ -621,7 +637,7 @@ export default function RevenuePage() {
                 <SortableHeader column="apartment">Apartment</SortableHeader>
                 <SortableHeader column="item">Item</SortableHeader>
                 <SortableHeader column="total_services" align="right">Services €</SortableHeader>
-                <SortableHeader column="commission_percentage">Commission %</SortableHeader>
+                <SortableHeader column="commission_percentage" align="center">%</SortableHeader>
                 <SortableHeader column="amount" align="right">Amount €</SortableHeader>
                 <SortableHeader column="amount_with_vat" align="right">Amount w/ VAT €</SortableHeader>
                 <SortableHeader column="status">Status</SortableHeader>
@@ -638,17 +654,17 @@ export default function RevenuePage() {
               ) : (
                 sortedRevenues.map((rev) => (
                   <tr key={rev.id}>
-                    <td className="text-sm">{rev.revenue_type}</td>
-                    <td className="font-mono text-sm">{rev.invoice_number || '—'}</td>
+                    <td>{rev.revenue_type}</td>
+                    <td className="font-mono">{rev.invoice_number || '—'}</td>
                     <td>{formatDate(rev.revenue_date)}</td>
-                    <td className="whitespace-nowrap">
-                      <div className="font-medium">{rev.booking?.guest_name}</div>
-                      <div className="text-gray-400">{rev.booking?.booking_ref}</div>
+                    <td>
+                      <div className="font-medium truncate">{rev.booking?.guest_name}</div>
+                      <div className="text-gray-400 truncate">{rev.booking?.booking_ref}</div>
                     </td>
                     <td>{rev.apartment?.name}</td>
                     <td>{rev.item?.name}</td>
                     <td className="text-right">{formatCurrency(rev.total_services)}</td>
-                    <td>{rev.commission_percentage}%</td>
+                    <td className="text-center">{rev.commission_percentage}%</td>
                     <td className="font-semibold text-right">
                       {formatCurrency(rev.amount)}
                     </td>
