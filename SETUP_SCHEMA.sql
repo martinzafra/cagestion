@@ -8,7 +8,7 @@ CREATE TYPE price_basis AS ENUM ('DAY', 'WEEK', 'MONTH');
 CREATE TYPE task_status AS ENUM ('TO BE DONE', 'DONE', 'NA');
 CREATE TYPE invoice_status AS ENUM ('TO BE DONE', 'SENT', 'NA');
 CREATE TYPE revenue_type AS ENUM ('INVOICE', 'COLLECTION');
-CREATE TYPE expense_type_enum AS ENUM ('INVOICE', 'PAYMENT');
+CREATE TYPE expense_type_enum AS ENUM ('INVOICE', 'PAYMENT', 'PLATFORM INV.');
 CREATE TYPE yes_no_na AS ENUM ('Y', 'N', 'NA');
 CREATE TYPE apartment_contract_type AS ENUM ('None', 'Yearly', 'Unlimited');
 

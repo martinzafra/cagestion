@@ -23,7 +23,7 @@ type SortColumn =
   | 'guest_name';
 
 const blankFormData = {
-  expense_type: 'INVOICE' as 'INVOICE' | 'PAYMENT',
+  expense_type: 'INVOICE' as 'INVOICE' | 'PAYMENT' | 'PLATFORM INV.',
   expense_category_id: '',
   vendor: '',
   expense_date: new Date().toISOString().split('T')[0],
@@ -409,13 +409,14 @@ export default function ExpensesPage() {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      expense_type: e.target.value as 'INVOICE' | 'PAYMENT',
+                      expense_type: e.target.value as 'INVOICE' | 'PAYMENT' | 'PLATFORM INV.',
                     })
                   }
                   className="select"
                 >
                   <option value="INVOICE">Invoice</option>
                   <option value="PAYMENT">Payment</option>
+                  <option value="PLATFORM INV.">Platform Inv.</option>
                 </select>
               </div>
               <div>
@@ -673,6 +674,7 @@ export default function ExpensesPage() {
                 <option value="">All Types</option>
                 <option value="INVOICE">Invoice</option>
                 <option value="PAYMENT">Payment</option>
+                <option value="PLATFORM INV.">Platform Inv.</option>
               </select>
               <select
                 value={listFilters.expense_category_id}
