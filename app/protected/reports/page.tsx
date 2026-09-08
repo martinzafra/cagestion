@@ -810,15 +810,6 @@ export default function ReportsPage() {
 
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
                   <ReportKpiCard
-                    label="Total Bookings"
-                    value={apartmentReport.totalBookings.toString()}
-                    projected={
-                      apartmentReport.isInProgress
-                        ? Math.round(apartmentReport.totalBookings * apartmentReport.projectionFactor).toString()
-                        : undefined
-                    }
-                  />
-                  <ReportKpiCard
                     label="Avg. Length of Stay"
                     value={`${apartmentReport.avgLengthOfStay.toFixed(1)} nights`}
                   />
