@@ -263,7 +263,7 @@ export default function ReportsPage() {
         )
         .in('status', ['CONFIRMED', 'DONE', 'FINISHED'])
         .lte('check_in_date', elapsedEnd)
-        .gte('check_out_date', start);
+        .gt('check_out_date', start);
       if (!isAggregate) bookingsQuery = bookingsQuery.eq('apartment_id', selectedApartmentId);
       else if (isAllActive) bookingsQuery = bookingsQuery.in('apartment_id', activeApartmentIds);
 
@@ -340,12 +340,13 @@ export default function ReportsPage() {
       let revenue: any[] = revenueRes.data || [];
       let expenses: any[] = expensesRes.data || [];
 
-      if (selectedPlatform) {
-        // A general expense (no booking_id) can't be attributed to a
-        // platform, so it drops out once a platform filter is active.
-        revenue = revenue.filter((r) => filteredBookingIds.has(r.booking_id));
-        expenses = expenses.filter((e) => e.booking_id && filteredBookingIds.has(e.booking_id));
-      }
+      // Revenue/expenses tied to a booking outside the current valid set -
+      // e.g. one that's since been CANCELLED, or (when a platform is
+      // selected) booked on a different platform - shouldn't count. A
+      // general entry with no booking_id is apartment-level and always
+      // counts.
+      revenue = revenue.filter((r) => !r.booking_id || filteredBookingIds.has(r.booking_id));
+      expenses = expenses.filter((e) => !e.booking_id || filteredBookingIds.has(e.booking_id));
 
       const grossRevenue = revenue.reduce((sum, r) => sum + (r.total_services || 0), 0);
       const commission = revenue
@@ -436,7 +437,7 @@ export default function ReportsPage() {
         )
         .in('status', ['CONFIRMED', 'DONE', 'FINISHED'])
         .lte('check_in_date', elapsedEnd)
-        .gte('check_out_date', start);
+        .gt('check_out_date', start);
       if (!isAggregate) bookingsQuery = bookingsQuery.eq('apartment_id', selectedApartmentId);
       else if (isAllActive) bookingsQuery = bookingsQuery.in('apartment_id', activeApartmentIds);
 
