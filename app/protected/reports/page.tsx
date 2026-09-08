@@ -109,7 +109,9 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
 
   const [apartments, setApartments] = useState<any[]>([]);
+  const [platforms, setPlatforms] = useState<any[]>([]);
   const [selectedApartmentId, setSelectedApartmentId] = useState('');
+  const [selectedPlatform, setSelectedPlatform] = useState('');
   const [periodOffset, setPeriodOffset] = useState(0);
   const [apartmentReport, setApartmentReport] = useState<ApartmentReportData | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
@@ -127,6 +129,7 @@ export default function ReportsPage() {
   useEffect(() => {
     if (userRole) {
       fetchApartments();
+      fetchPlatforms();
     }
   }, [userRole]);
 
@@ -136,7 +139,7 @@ export default function ReportsPage() {
     } else {
       setApartmentReport(null);
     }
-  }, [selectedApartmentId, periodOffset]);
+  }, [selectedApartmentId, periodOffset, selectedPlatform]);
 
   const checkAuth = async () => {
     try {
@@ -223,65 +226,109 @@ export default function ReportsPage() {
     }
   };
 
+  const fetchPlatforms = async () => {
+    try {
+      const { data, error } = await supabase.from('inventory_platforms').select('id, name').order('name');
+      if (error) throw error;
+      setPlatforms(data || []);
+    } catch (error) {
+      toast.error('Failed to fetch platforms');
+    }
+  };
+
   const fetchApartmentReport = async () => {
-    const apt = apartments.find((a) => a.id === selectedApartmentId);
-    if (!apt) return;
+    const isAll = selectedApartmentId === 'ALL';
+    const apt = isAll ? null : apartments.find((a) => a.id === selectedApartmentId);
+    if (!isAll && !apt) return;
 
     setReportLoading(true);
     try {
-      const { start, end, usingCalendarFallback } = getPeriodBounds(apt.contract_date, periodOffset);
+      const { start, end, usingCalendarFallback } = getPeriodBounds(
+        isAll ? null : apt!.contract_date,
+        periodOffset
+      );
       const todayISO = new Date().toISOString().split('T')[0];
       const isInProgress = todayISO < end;
       const elapsedEnd = isInProgress ? todayISO : end;
 
-      const [bookingsRes, revenueRes, expensesRes] = await Promise.all([
-        supabase
-          .from('bookings')
-          .select('id, check_in_date, check_out_date, owners_booking, platform:inventory_platforms(name)')
-          .eq('apartment_id', selectedApartmentId)
-          .in('status', ['CONFIRMED', 'DONE', 'FINISHED'])
-          .lte('check_in_date', elapsedEnd)
-          .gte('check_out_date', start),
-        supabase
-          .from('revenue_invoicing')
-          .select('total_services, amount, item:inventory_invoice_items(name)')
-          .eq('apartment_id', selectedApartmentId)
-          .gte('revenue_date', start)
-          .lte('revenue_date', elapsedEnd),
-        supabase
-          .from('expenses')
-          .select('total')
-          .eq('apartment_id', selectedApartmentId)
-          .gte('expense_date', start)
-          .lte('expense_date', elapsedEnd),
-      ]);
+      let bookingsQuery = supabase
+        .from('bookings')
+        .select('id, check_in_date, check_out_date, owners_booking, platform:inventory_platforms(name)')
+        .in('status', ['CONFIRMED', 'DONE', 'FINISHED'])
+        .lte('check_in_date', elapsedEnd)
+        .gte('check_out_date', start);
+      if (!isAll) bookingsQuery = bookingsQuery.eq('apartment_id', selectedApartmentId);
 
+      const bookingsRes = await bookingsQuery;
       if (bookingsRes.error) throw bookingsRes.error;
-      if (revenueRes.error) throw revenueRes.error;
-      if (expensesRes.error) throw expensesRes.error;
+      const allBookings: any[] = bookingsRes.data || [];
 
-      const bookings = bookingsRes.data || [];
-      const revenue: any[] = revenueRes.data || [];
-      const expenses = expensesRes.data || [];
-
+      // Occupancy always reflects every booking regardless of the platform
+      // filter - the apartment is occupied or not, no matter who booked it.
       let occupiedNights = 0;
+      allBookings.forEach((b) => {
+        const overlapStart = b.check_in_date > start ? b.check_in_date : start;
+        const overlapEnd = b.check_out_date < elapsedEnd ? b.check_out_date : elapsedEnd;
+        const nights = daysBetween(overlapStart, overlapEnd);
+        if (nights > 0) occupiedNights += nights;
+      });
+      // elapsedDays is a pure time measure (for the progress badge/
+      // projections); availableNights is elapsedDays x apartment count when
+      // aggregating "All Apartments", since each one has that many nights on
+      // offer independently.
+      const elapsedDays = daysBetween(start, elapsedEnd);
+      const availableNights = elapsedDays * (isAll ? apartments.length : 1);
+      const occupancyRate = availableNights > 0 ? occupiedNights / availableNights : 0;
+
+      // Everything else (revenue, expenses, counts, ADR) is scoped to the
+      // selected platform when one is chosen.
+      const filteredBookings = selectedPlatform
+        ? allBookings.filter((b) => (b.platform?.name || 'Other') === selectedPlatform)
+        : allBookings;
+
+      let filteredOccupiedNights = 0;
       let revenueNights = 0; // excludes owner-use nights - their rate is 0
       const platformCounts: Record<string, number> = {};
-
-      bookings.forEach((b: any) => {
+      filteredBookings.forEach((b) => {
         const overlapStart = b.check_in_date > start ? b.check_in_date : start;
         const overlapEnd = b.check_out_date < elapsedEnd ? b.check_out_date : elapsedEnd;
         const nights = daysBetween(overlapStart, overlapEnd);
         if (nights > 0) {
-          occupiedNights += nights;
+          filteredOccupiedNights += nights;
           if (!b.owners_booking) revenueNights += nights;
         }
         const platformName = b.platform?.name || 'Other';
         platformCounts[platformName] = (platformCounts[platformName] || 0) + 1;
       });
+      const filteredBookingIds = new Set(filteredBookings.map((b) => b.id));
 
-      const availableNights = daysBetween(start, elapsedEnd);
-      const occupancyRate = availableNights > 0 ? occupiedNights / availableNights : 0;
+      let revenueQuery = supabase
+        .from('revenue_invoicing')
+        .select('total_services, amount, booking_id, item:inventory_invoice_items(name)')
+        .gte('revenue_date', start)
+        .lte('revenue_date', elapsedEnd);
+      if (!isAll) revenueQuery = revenueQuery.eq('apartment_id', selectedApartmentId);
+
+      let expensesQuery = supabase
+        .from('expenses')
+        .select('total, booking_id')
+        .gte('expense_date', start)
+        .lte('expense_date', elapsedEnd);
+      if (!isAll) expensesQuery = expensesQuery.eq('apartment_id', selectedApartmentId);
+
+      const [revenueRes, expensesRes] = await Promise.all([revenueQuery, expensesQuery]);
+      if (revenueRes.error) throw revenueRes.error;
+      if (expensesRes.error) throw expensesRes.error;
+
+      let revenue: any[] = revenueRes.data || [];
+      let expenses: any[] = expensesRes.data || [];
+
+      if (selectedPlatform) {
+        // A general expense (no booking_id) can't be attributed to a
+        // platform, so it drops out once a platform filter is active.
+        revenue = revenue.filter((r) => filteredBookingIds.has(r.booking_id));
+        expenses = expenses.filter((e) => e.booking_id && filteredBookingIds.has(e.booking_id));
+      }
 
       const grossRevenue = revenue.reduce((sum, r) => sum + (r.total_services || 0), 0);
       const commission = revenue
@@ -290,23 +337,27 @@ export default function ReportsPage() {
       const totalExpenses = expenses.reduce((sum, e) => sum + (e.total || 0), 0);
       const netIncome = grossRevenue - commission - totalExpenses;
       const adr = revenueNights > 0 ? grossRevenue / revenueNights : 0;
+      // RevPAR keeps the same unfiltered available-nights denominator as
+      // Occupancy, so a single platform's RevPAR shows its contribution per
+      // available night rather than being inflated by a smaller base.
       const revPar = availableNights > 0 ? grossRevenue / availableNights : 0;
-      const avgLengthOfStay = bookings.length > 0 ? occupiedNights / bookings.length : 0;
+      const avgLengthOfStay =
+        filteredBookings.length > 0 ? filteredOccupiedNights / filteredBookings.length : 0;
 
       const totalDays = daysBetween(start, end);
-      const projectionFactor = isInProgress && availableNights > 0 ? totalDays / availableNights : 1;
+      const projectionFactor = isInProgress && elapsedDays > 0 ? totalDays / elapsedDays : 1;
 
       setApartmentReport({
-        apartmentName: apt.name,
+        apartmentName: isAll ? 'All Apartments' : apt!.name,
         periodStart: start,
         periodEnd: end,
         isInProgress,
         usingCalendarFallback,
-        pctComplete: totalDays > 0 ? Math.min(100, Math.round((availableNights / totalDays) * 100)) : 100,
+        pctComplete: totalDays > 0 ? Math.min(100, Math.round((elapsedDays / totalDays) * 100)) : 100,
         occupancyRate,
         occupiedNights,
         availableNights,
-        totalBookings: bookings.length,
+        totalBookings: filteredBookings.length,
         avgLengthOfStay,
         grossRevenue,
         commission,
@@ -339,7 +390,7 @@ export default function ReportsPage() {
       <div className="card">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <h2 className="text-xl font-bold text-gray-900">Apartment Annual Report</h2>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <select
               value={selectedApartmentId}
               onChange={(e) => {
@@ -348,9 +399,22 @@ export default function ReportsPage() {
               }}
               className="select"
             >
+              <option value="ALL">All Apartments</option>
               {apartments.map((apt) => (
                 <option key={apt.id} value={apt.id}>
                   {apt.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={selectedPlatform}
+              onChange={(e) => setSelectedPlatform(e.target.value)}
+              className="select"
+            >
+              <option value="">All Platforms</option>
+              {platforms.map((p) => (
+                <option key={p.id} value={p.name}>
+                  {p.name}
                 </option>
               ))}
             </select>
@@ -421,6 +485,7 @@ export default function ReportsPage() {
                     </p>
                     <p className="text-xs text-gray-500 mt-1">
                       {apartmentReport.occupiedNights} of {apartmentReport.availableNights} nights booked
+                      {selectedPlatform && ' — all platforms, not just the one selected'}
                     </p>
                   </div>
                 </div>
