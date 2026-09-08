@@ -66,7 +66,7 @@ interface ApartmentReportData {
   availableNights: number;
   totalBookings: number;
   avgLengthOfStay: number;
-  grossRevenue: number;
+  totalRevenue: number;
   commission: number;
   caOther: number;
   totalExpenses: number;
@@ -259,7 +259,7 @@ export default function ReportsPage() {
       let bookingsQuery = supabase
         .from('bookings')
         .select(
-          'id, check_in_date, check_out_date, owners_booking, cleaning_charge, platform:inventory_platforms(name)'
+          'id, check_in_date, check_out_date, owners_booking, cleaning_charge, other_charge, guest_total_amount, total_rent, platform:inventory_platforms(name)'
         )
         .in('status', ['FINISHED', 'CANCELLED'])
         .lte('check_in_date', elapsedEnd)
@@ -319,7 +319,7 @@ export default function ReportsPage() {
 
       let revenueQuery = supabase
         .from('revenue_invoicing')
-        .select('total_services, amount, booking_id, item:inventory_invoice_items(name)')
+        .select('total_services, amount, amount_with_vat, booking_id, item:inventory_invoice_items(name)')
         .gte('revenue_date', start)
         .lte('revenue_date', elapsedEnd);
       if (!isAggregate) revenueQuery = revenueQuery.eq('apartment_id', selectedApartmentId);
@@ -349,15 +349,29 @@ export default function ReportsPage() {
       revenue = revenue.filter((r) => !r.booking_id || filteredBookingIds.has(r.booking_id));
       expenses = expenses.filter((e) => !e.booking_id || filteredBookingIds.has(e.booking_id));
 
-      const grossRevenue = revenue.reduce((sum, r) => sum + (r.total_services || 0), 0);
+      // Total Revenue: pure rental income - guest_total_amount minus the
+      // cleaning/other pass-through charges, straight from bookings (not
+      // revenue_invoicing).
+      const totalRevenue = filteredBookings.reduce(
+        (sum, b) => sum + ((b.guest_total_amount || 0) - (b.cleaning_charge || 0) - (b.other_charge || 0)),
+        0
+      );
       const commission = revenue
         .filter((r) => r.item?.name === 'Commission')
         .reduce((sum, r) => sum + (r.amount || 0), 0);
+      const commissionWithVat = revenue
+        .filter((r) => r.item?.name === 'Commission')
+        .reduce((sum, r) => sum + (r.amount_with_vat || 0), 0);
+      const platformInvoiceWithVat = expenses
+        .filter((e) => e.category?.name === 'Platform Invoice')
+        .reduce((sum, e) => sum + (e.total || 0), 0);
       // CA Other: the margin between what guests were charged for
       // cleaning and what was actually paid out for Cleaning/Laundry on
       // those same bookings. Net of VAT (expenses.amount), matching the
       // Bookings Report export.
       const cleaningChargeTotal = filteredBookings.reduce((sum, b) => sum + (b.cleaning_charge || 0), 0);
+      const otherChargeTotal = filteredBookings.reduce((sum, b) => sum + (b.other_charge || 0), 0);
+      const totalRentSum = filteredBookings.reduce((sum, b) => sum + (b.total_rent || 0), 0);
       const cleaningLaundryExpenses = expenses
         .filter(
           (e) =>
@@ -367,13 +381,19 @@ export default function ReportsPage() {
         )
         .reduce((sum, e) => sum + (e.amount || 0), 0);
       const caOther = cleaningChargeTotal - cleaningLaundryExpenses;
-      const totalExpenses = expenses.reduce((sum, e) => sum + (e.total || 0), 0);
-      const netIncome = grossRevenue - commission - totalExpenses;
-      const adr = revenueNights > 0 ? grossRevenue / revenueNights : 0;
+      // Total Expenses (owner profitability view): the pass-through
+      // cleaning/other charges plus what CA and the platform actually
+      // deduct, VAT included.
+      const totalExpenses = cleaningChargeTotal + otherChargeTotal + commissionWithVat + platformInvoiceWithVat;
+      // Net Income skips cleaning/other entirely (they cancel out of Total
+      // Revenue/Total Expenses) - it's Total Rent minus CA's and the
+      // platform's cuts.
+      const netIncome = totalRentSum - commissionWithVat - platformInvoiceWithVat;
+      const adr = revenueNights > 0 ? totalRevenue / revenueNights : 0;
       // RevPAR keeps the same unfiltered available-nights denominator as
       // Occupancy, so a single platform's RevPAR shows its contribution per
       // available night rather than being inflated by a smaller base.
-      const revPar = availableNights > 0 ? grossRevenue / availableNights : 0;
+      const revPar = availableNights > 0 ? totalRevenue / availableNights : 0;
       const avgLengthOfStay =
         filteredBookings.length > 0 ? filteredOccupiedNights / filteredBookings.length : 0;
 
@@ -392,7 +412,7 @@ export default function ReportsPage() {
         availableNights,
         totalBookings: filteredBookings.length,
         avgLengthOfStay,
-        grossRevenue,
+        totalRevenue,
         commission,
         caOther,
         totalExpenses,
@@ -734,11 +754,11 @@ export default function ReportsPage() {
                     value={formatCurrency(apartmentReport.revPar)}
                   />
                   <ReportKpiCard
-                    label="Gross Revenue"
-                    value={formatCurrency(apartmentReport.grossRevenue)}
+                    label="Total Revenue"
+                    value={formatCurrency(apartmentReport.totalRevenue)}
                     projected={
                       apartmentReport.isInProgress
-                        ? formatCurrency(apartmentReport.grossRevenue * apartmentReport.projectionFactor)
+                        ? formatCurrency(apartmentReport.totalRevenue * apartmentReport.projectionFactor)
                         : undefined
                     }
                     valueClassName="text-green-600"

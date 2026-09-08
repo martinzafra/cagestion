@@ -130,6 +130,10 @@ CREATE TABLE IF NOT EXISTS revenue_invoicing (
   amount DECIMAL(10, 2) GENERATED ALWAYS AS (
     total_services * (commission_percentage / 100)
   ) STORED,
+  vat DECIMAL(10, 2) DEFAULT 0,
+  amount_with_vat DECIMAL(10, 2) GENERATED ALWAYS AS (
+    (total_services * (commission_percentage / 100)) + COALESCE(vat, 0)
+  ) STORED,
 
   issued BOOLEAN DEFAULT FALSE,
   attachment_url TEXT,

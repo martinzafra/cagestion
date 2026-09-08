@@ -22,6 +22,7 @@ type SortColumn =
   | 'total_services'
   | 'commission_percentage'
   | 'amount'
+  | 'amount_with_vat'
   | 'status';
 
 const blankFormData = {
@@ -33,6 +34,7 @@ const blankFormData = {
   invoice_item_id: '',
   total_services: 0,
   commission_percentage: 0,
+  vat: 0,
   issued: false,
   attachment_url: '',
 };
@@ -119,6 +121,7 @@ export default function RevenuePage() {
         invoice_item_id: formData.invoice_item_id,
         total_services: formData.total_services,
         commission_percentage: formData.commission_percentage,
+        vat: formData.vat || 0,
         issued: formData.issued,
         attachment_url: formData.attachment_url || null,
       };
@@ -159,6 +162,7 @@ export default function RevenuePage() {
       invoice_item_id: rev.invoice_item_id,
       total_services: rev.total_services,
       commission_percentage: rev.commission_percentage,
+      vat: rev.vat || 0,
       issued: rev.issued,
       attachment_url: rev.attachment_url || '',
     });
@@ -233,6 +237,8 @@ export default function RevenuePage() {
       { header: 'Services €', value: (r) => r.total_services },
       { header: 'Commission %', value: (r) => r.commission_percentage },
       { header: 'Amount €', value: (r) => r.amount },
+      { header: 'VAT €', value: (r) => r.vat },
+      { header: 'Amount with VAT €', value: (r) => r.amount_with_vat },
       { header: 'Status', value: (r) => (r.issued ? 'Issued' : 'Draft') },
       { header: 'Has Attachment', value: (r) => (r.attachment_url ? 'Yes' : 'No') },
     ]);
@@ -269,6 +275,8 @@ export default function RevenuePage() {
         return rev.commission_percentage || 0;
       case 'amount':
         return rev.amount || 0;
+      case 'amount_with_vat':
+        return rev.amount_with_vat || 0;
       case 'status':
         return rev.issued ? 1 : 0;
       default:
@@ -423,7 +431,7 @@ export default function RevenuePage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="label">Invoice Item *</label>
                 <select
@@ -468,6 +476,22 @@ export default function RevenuePage() {
                     setFormData({
                       ...formData,
                       commission_percentage: parseFloat(e.target.value) || 0,
+                    })
+                  }
+                  className="input"
+                  step="0.01"
+                />
+              </div>
+              <div>
+                <label className="label">VAT €</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={formData.vat}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      vat: parseFloat(e.target.value) || 0,
                     })
                   }
                   className="input"
@@ -584,6 +608,7 @@ export default function RevenuePage() {
                 <SortableHeader column="total_services" align="right">Services €</SortableHeader>
                 <SortableHeader column="commission_percentage">Commission %</SortableHeader>
                 <SortableHeader column="amount" align="right">Amount €</SortableHeader>
+                <SortableHeader column="amount_with_vat" align="right">Amount w/ VAT €</SortableHeader>
                 <SortableHeader column="status">Status</SortableHeader>
                 <th>Actions</th>
               </tr>
@@ -591,7 +616,7 @@ export default function RevenuePage() {
             <tbody>
               {sortedRevenues.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="text-center py-8 text-gray-500">
+                  <td colSpan={12} className="text-center py-8 text-gray-500">
                     No revenue entries
                   </td>
                 </tr>
@@ -612,6 +637,7 @@ export default function RevenuePage() {
                     <td className="font-semibold text-right">
                       {formatCurrency(rev.amount)}
                     </td>
+                    <td className="text-right">{formatCurrency(rev.amount_with_vat)}</td>
                     <td>
                       <span
                         className={`px-2 py-1 rounded text-xs font-medium uppercase ${
