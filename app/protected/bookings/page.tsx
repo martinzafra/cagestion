@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Calendar, List } from 'lucide-react';
+import { Plus, Calendar, List, FileSpreadsheet } from 'lucide-react';
 import BookingForm from '@/components/BookingForm';
 import BookingsList from '@/components/BookingsList';
 import BookingCalendar from '@/components/BookingCalendar';
@@ -10,6 +10,7 @@ import ApartmentChipFilter from '@/components/ApartmentChipFilter';
 import Switch from '@/components/Switch';
 import { getApartmentColorMap } from '@/lib/apartmentColors';
 import { fetchAllowedApartments, fetchAllApartments } from '@/lib/apartmentAccess';
+import { exportToExcel } from '@/lib/exportExcel';
 import toast from 'react-hot-toast';
 
 type ViewMode = 'list' | 'calendar';
@@ -141,6 +142,44 @@ export default function BookingsPage() {
     return true;
   });
 
+  const handleExport = () => {
+    exportToExcel('bookings', filteredBookings, [
+      { header: 'Booking Date', value: (b) => b.booking_date },
+      { header: 'Booking Ref', value: (b) => b.booking_ref },
+      { header: 'Status', value: (b) => b.status },
+      { header: 'Agent', value: (b) => b.agent?.name },
+      { header: 'Apartment', value: (b) => b.apartment?.name },
+      { header: 'Platform', value: (b) => b.platform?.name },
+      { header: 'Guest Name', value: (b) => b.guest_name },
+      { header: 'Guest Phone', value: (b) => b.guest_phone },
+      { header: 'Guest Email', value: (b) => b.guest_email },
+      { header: 'Check-in Date', value: (b) => b.check_in_date },
+      { header: 'Check-in Time', value: (b) => b.check_in_time },
+      { header: 'Check-out Date', value: (b) => b.check_out_date },
+      { header: 'Check-out Time', value: (b) => b.check_out_time },
+      { header: 'Nights', value: (b) => b.nights },
+      { header: 'Number of Guests', value: (b) => b.number_of_guests },
+      { header: 'Deposit', value: (b) => b.deposit },
+      { header: 'Deposit Amount', value: (b) => b.deposit_amount },
+      { header: 'Payment Type', value: (b) => b.payment_type?.name },
+      { header: 'Price Basis', value: (b) => b.price_basis },
+      { header: 'Daily Price', value: (b) => b.daily_price },
+      { header: 'Total Rent', value: (b) => b.total_rent },
+      { header: 'Cleaning Charge', value: (b) => b.cleaning_charge },
+      { header: 'Other Charge', value: (b) => b.other_charge },
+      { header: 'Guest Total Amount', value: (b) => b.guest_total_amount },
+      { header: 'Owners Booking', value: (b) => (b.owners_booking ? 'Yes' : 'No') },
+      { header: 'Comments', value: (b) => b.comments },
+      { header: 'Guest Comments', value: (b) => b.guest_comments },
+      { header: 'Police Registration', value: (b) => b.police_registration },
+      { header: 'Platform Invoice', value: (b) => b.platform_invoice },
+      { header: 'Platform Invoice Date', value: (b) => b.platform_invoice_date },
+      { header: 'Final Liquidation', value: (b) => b.final_liquidation },
+      { header: 'Final Liquidation Date', value: (b) => b.final_liquidation_date },
+      { header: 'Inv & Exp Done', value: (b) => (b.inv_exp_done ? 'Yes' : 'No') },
+    ]);
+  };
+
   const colorMap = getApartmentColorMap(apartments);
   const activeApartments = apartments.filter((a) => a.active !== false);
   const calendarColorMap = getApartmentColorMap(allApartments);
@@ -159,10 +198,16 @@ export default function BookingsPage() {
           <h1 className="text-3xl font-bold text-gray-900">Bookings</h1>
           <p className="text-gray-600 mt-1">Manage accommodation reservations</p>
         </div>
-        <button onClick={handleNewBooking} className="btn-primary flex items-center gap-2">
-          <Plus size={18} />
-          New Booking
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleExport} className="btn-secondary flex items-center gap-2">
+            <FileSpreadsheet size={18} />
+            Export
+          </button>
+          <button onClick={handleNewBooking} className="btn-primary flex items-center gap-2">
+            <Plus size={18} />
+            New Booking
+          </button>
+        </div>
       </div>
 
       {showForm && (

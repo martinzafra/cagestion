@@ -2,12 +2,13 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, Pencil, Paperclip, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, Pencil, Paperclip, X, ChevronUp, ChevronDown, FileSpreadsheet } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDate, formatCurrency, formatBookingDateRange } from '@/lib/calculations';
 import { getApartmentColorMap } from '@/lib/apartmentColors';
 import { fetchAllowedApartments } from '@/lib/apartmentAccess';
 import { compareSortValues } from '@/lib/sort';
+import { exportToExcel } from '@/lib/exportExcel';
 import ApartmentChipFilter from '@/components/ApartmentChipFilter';
 
 type SortColumn =
@@ -288,6 +289,23 @@ export default function ExpensesPage() {
     return true;
   });
 
+  const handleExport = () => {
+    exportToExcel('expenses', sortedExpenses, [
+      { header: 'Type', value: (e) => e.expense_type },
+      { header: 'Category', value: (e) => e.category?.name },
+      { header: 'Vendor', value: (e) => e.vendor },
+      { header: 'Date', value: (e) => e.expense_date },
+      { header: 'Invoice #', value: (e) => e.invoice_number },
+      { header: 'Apartment', value: (e) => e.apartment?.name },
+      { header: 'Booking / Guest', value: (e) => e.booking?.guest_name || 'General' },
+      { header: 'Amount €', value: (e) => e.amount },
+      { header: 'VAT €', value: (e) => e.vat },
+      { header: 'Total €', value: (e) => e.total },
+      { header: 'Comments', value: (e) => e.comments },
+      { header: 'Has Attachment', value: (e) => (e.attachment_url ? 'Yes' : 'No') },
+    ]);
+  };
+
   const handleSort = (column: SortColumn) => {
     if (sortColumn !== column) {
       setSortColumn(column);
@@ -357,18 +375,24 @@ export default function ExpensesPage() {
           <h1 className="text-3xl font-bold text-gray-900">Expenses</h1>
           <p className="text-gray-600 mt-1">Track all property-related costs</p>
         </div>
-        <button
-          onClick={() => {
-            setEditingExpenseId(undefined);
-            setFormData(blankFormData);
-            setPendingAttachmentFile(null);
-            setShowForm((prev) => !prev);
-          }}
-          className="btn-primary flex items-center gap-2"
-        >
-          <Plus size={18} />
-          New Expense
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleExport} className="btn-secondary flex items-center gap-2">
+            <FileSpreadsheet size={18} />
+            Export
+          </button>
+          <button
+            onClick={() => {
+              setEditingExpenseId(undefined);
+              setFormData(blankFormData);
+              setPendingAttachmentFile(null);
+              setShowForm((prev) => !prev);
+            }}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus size={18} />
+            New Expense
+          </button>
+        </div>
       </div>
 
       {showForm && (

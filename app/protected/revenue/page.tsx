@@ -2,12 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, Pencil, Download, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, Pencil, FileSpreadsheet, ChevronUp, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDate, formatCurrency } from '@/lib/calculations';
 import { getApartmentColorMap } from '@/lib/apartmentColors';
 import { fetchAllowedApartments } from '@/lib/apartmentAccess';
 import { compareSortValues } from '@/lib/sort';
+import { exportToExcel } from '@/lib/exportExcel';
 import ApartmentChipFilter from '@/components/ApartmentChipFilter';
 import Switch from '@/components/Switch';
 
@@ -220,6 +221,23 @@ export default function RevenuePage() {
     return true;
   });
 
+  const handleExport = () => {
+    exportToExcel('revenue', sortedRevenues, [
+      { header: 'Type', value: (r) => r.revenue_type },
+      { header: 'Invoice #', value: (r) => r.invoice_number },
+      { header: 'Date', value: (r) => r.revenue_date },
+      { header: 'Guest Name', value: (r) => r.booking?.guest_name },
+      { header: 'Booking Ref', value: (r) => r.booking?.booking_ref },
+      { header: 'Apartment', value: (r) => r.apartment?.name },
+      { header: 'Item', value: (r) => r.item?.name },
+      { header: 'Services €', value: (r) => r.total_services },
+      { header: 'Commission %', value: (r) => r.commission_percentage },
+      { header: 'Amount €', value: (r) => r.amount },
+      { header: 'Status', value: (r) => (r.issued ? 'Issued' : 'Draft') },
+      { header: 'Has Attachment', value: (r) => (r.attachment_url ? 'Yes' : 'No') },
+    ]);
+  };
+
   const handleSort = (column: SortColumn) => {
     if (sortColumn !== column) {
       setSortColumn(column);
@@ -291,17 +309,23 @@ export default function RevenuePage() {
           <h1 className="text-3xl font-bold text-gray-900">Revenue & Invoicing</h1>
           <p className="text-gray-600 mt-1">Manage income from bookings</p>
         </div>
-        <button
-          onClick={() => {
-            setEditingRevenueId(undefined);
-            setFormData(blankFormData);
-            setShowForm((prev) => !prev);
-          }}
-          className="btn-primary flex items-center gap-2"
-        >
-          <Plus size={18} />
-          New Entry
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleExport} className="btn-secondary flex items-center gap-2">
+            <FileSpreadsheet size={18} />
+            Export
+          </button>
+          <button
+            onClick={() => {
+              setEditingRevenueId(undefined);
+              setFormData(blankFormData);
+              setShowForm((prev) => !prev);
+            }}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus size={18} />
+            New Entry
+          </button>
+        </div>
       </div>
 
       {showForm && (

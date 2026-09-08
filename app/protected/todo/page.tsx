@@ -5,10 +5,11 @@ import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import StatusSquare from '@/components/StatusSquare';
 import { formatDate } from '@/lib/calculations';
-import { ChevronUp, ChevronDown, Plus, Image as ImageIcon, X, Check } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, Image as ImageIcon, X, Check, FileSpreadsheet } from 'lucide-react';
 import Switch from '@/components/Switch';
 import { fetchAllowedApartments } from '@/lib/apartmentAccess';
 import { compareSortValues } from '@/lib/sort';
+import { exportToExcel } from '@/lib/exportExcel';
 
 type TaskStatus = 'TO BE DONE' | 'DONE' | 'NA';
 type InvoiceStatus = 'TO BE DONE' | 'SENT' | 'NA';
@@ -192,6 +193,25 @@ export default function TodoPage() {
     ? filteredBookings
     : filteredBookings.filter((b) => pendingSnapshotIds.has(b.id));
 
+  const handleExport = () => {
+    exportToExcel('todo', sortedBookings, [
+      { header: 'Apartment', value: (b) => b.apartment?.name },
+      { header: 'Guest Name', value: (b) => b.guest_name },
+      { header: 'Booking Ref', value: (b) => b.booking_ref },
+      { header: 'Booking Status', value: (b) => b.status },
+      { header: 'To Do Status', value: (b) => PHASE_LABEL[computeTodoStatus(b)] || computeTodoStatus(b) },
+      { header: 'Check-in Date', value: (b) => b.check_in_date },
+      { header: 'Check-out Date', value: (b) => b.check_out_date },
+      { header: 'Police Registration', value: (b) => b.police_registration },
+      { header: 'Police Registration Photo', value: (b) => (b.police_registration_file ? 'Yes' : 'No') },
+      { header: 'Platform Invoice', value: (b) => b.platform_invoice },
+      { header: 'Platform Invoice Date', value: (b) => b.platform_invoice_date },
+      { header: 'Owner Liquidation', value: (b) => b.final_liquidation },
+      { header: 'Owner Liquidation Date', value: (b) => b.final_liquidation_date },
+      { header: 'Inv & Exp Done', value: (b) => (b.inv_exp_done ? 'Yes' : 'No') },
+    ]);
+  };
+
   const handleSort = (column: SortColumn) => {
     if (sortColumn !== column) {
       setSortColumn(column);
@@ -353,11 +373,17 @@ export default function TodoPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">To Do</h1>
-        <p className="text-gray-600 mt-1">
-          Track booking status and pending administrative tasks
-        </p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">To Do</h1>
+          <p className="text-gray-600 mt-1">
+            Track booking status and pending administrative tasks
+          </p>
+        </div>
+        <button onClick={handleExport} className="btn-secondary flex items-center gap-2">
+          <FileSpreadsheet size={18} />
+          Export
+        </button>
       </div>
 
       {/* Workflow legend */}
