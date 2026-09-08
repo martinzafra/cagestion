@@ -485,7 +485,7 @@ export default function RevenuePage() {
                 />
               </div>
               <div>
-                <label className="label">Subtotal € (calculated)</label>
+                <label className="label whitespace-nowrap">Subtotal € (calculated)</label>
                 <input
                   type="number"
                   value={commissionAmount}
@@ -511,7 +511,7 @@ export default function RevenuePage() {
                 />
               </div>
               <div>
-                <label className="label">Total Amount € (calculated)</label>
+                <label className="label whitespace-nowrap">Total € (calculated)</label>
                 <input
                   type="number"
                   value={totalAmount}
