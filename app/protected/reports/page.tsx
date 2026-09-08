@@ -59,6 +59,7 @@ interface ApartmentReportData {
   avgLengthOfStay: number;
   grossRevenue: number;
   commission: number;
+  caOther: number;
   totalExpenses: number;
   netIncome: number;
   adr: number;
@@ -247,7 +248,9 @@ export default function ReportsPage() {
 
       let bookingsQuery = supabase
         .from('bookings')
-        .select('id, check_in_date, check_out_date, owners_booking, platform:inventory_platforms(name)')
+        .select(
+          'id, check_in_date, check_out_date, owners_booking, cleaning_charge, platform:inventory_platforms(name)'
+        )
         .in('status', ['CONFIRMED', 'DONE', 'FINISHED'])
         .lte('check_in_date', elapsedEnd)
         .gte('check_out_date', start);
@@ -314,7 +317,7 @@ export default function ReportsPage() {
 
       let expensesQuery = supabase
         .from('expenses')
-        .select('total, booking_id')
+        .select('total, booking_id, category:inventory_expense_types(name)')
         .gte('expense_date', start)
         .lte('expense_date', elapsedEnd);
       if (!isAggregate) expensesQuery = expensesQuery.eq('apartment_id', selectedApartmentId);
@@ -338,6 +341,19 @@ export default function ReportsPage() {
       const commission = revenue
         .filter((r) => r.item?.name === 'Commission')
         .reduce((sum, r) => sum + (r.amount || 0), 0);
+      // CA Other: the margin between what guests were charged for
+      // cleaning and what was actually paid out for Cleaning/Laundry on
+      // those same bookings.
+      const cleaningChargeTotal = filteredBookings.reduce((sum, b) => sum + (b.cleaning_charge || 0), 0);
+      const cleaningLaundryExpenses = expenses
+        .filter(
+          (e) =>
+            e.booking_id &&
+            filteredBookingIds.has(e.booking_id) &&
+            ['Cleaning', 'Laundry'].includes(e.category?.name)
+        )
+        .reduce((sum, e) => sum + (e.total || 0), 0);
+      const caOther = cleaningChargeTotal - cleaningLaundryExpenses;
       const totalExpenses = expenses.reduce((sum, e) => sum + (e.total || 0), 0);
       const netIncome = grossRevenue - commission - totalExpenses;
       const adr = revenueNights > 0 ? grossRevenue / revenueNights : 0;
@@ -365,6 +381,7 @@ export default function ReportsPage() {
         avgLengthOfStay,
         grossRevenue,
         commission,
+        caOther,
         totalExpenses,
         netIncome,
         adr,
@@ -535,6 +552,15 @@ export default function ReportsPage() {
                     projected={
                       apartmentReport.isInProgress
                         ? formatCurrency(apartmentReport.commission * apartmentReport.projectionFactor)
+                        : undefined
+                    }
+                  />
+                  <ReportKpiCard
+                    label="CA Other"
+                    value={formatCurrency(apartmentReport.caOther)}
+                    projected={
+                      apartmentReport.isInProgress
+                        ? formatCurrency(apartmentReport.caOther * apartmentReport.projectionFactor)
                         : undefined
                     }
                   />
