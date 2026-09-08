@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { formatDate, formatCurrency } from '@/lib/calculations';
 import { getApartmentColorMap } from '@/lib/apartmentColors';
 import { fetchAllowedApartments } from '@/lib/apartmentAccess';
+import { fetchCurrentUserRole } from '@/lib/userRole';
 import { compareSortValues } from '@/lib/sort';
 import { exportToExcel } from '@/lib/exportExcel';
 import ApartmentChipFilter from '@/components/ApartmentChipFilter';
@@ -40,6 +41,7 @@ const blankFormData = {
 };
 
 export default function RevenuePage() {
+  const [userRole, setUserRole] = useState('');
   const [revenues, setRevenues] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -64,6 +66,7 @@ export default function RevenuePage() {
 
   useEffect(() => {
     fetchData();
+    fetchCurrentUserRole().then(setUserRole);
   }, []);
 
   const fetchData = async () => {
@@ -320,10 +323,12 @@ export default function RevenuePage() {
           <p className="text-gray-600 mt-1">Manage income from bookings</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handleExport} className="btn-secondary flex items-center gap-2">
-            <FileSpreadsheet size={18} />
-            Export
-          </button>
+          {userRole === 'admin' && (
+            <button onClick={handleExport} className="btn-secondary flex items-center gap-2">
+              <FileSpreadsheet size={18} />
+              Export
+            </button>
+          )}
           <button
             onClick={() => {
               setEditingRevenueId(undefined);

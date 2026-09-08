@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/calculations';
 import { ChevronUp, ChevronDown, Plus, Image as ImageIcon, X, Check, FileSpreadsheet } from 'lucide-react';
 import Switch from '@/components/Switch';
 import { fetchAllowedApartments } from '@/lib/apartmentAccess';
+import { fetchCurrentUserRole } from '@/lib/userRole';
 import { compareSortValues } from '@/lib/sort';
 import { exportToExcel } from '@/lib/exportExcel';
 
@@ -101,6 +102,7 @@ function computeTodoStatus(b: BookingRow): string {
 }
 
 export default function TodoPage() {
+  const [userRole, setUserRole] = useState('');
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [apartments, setApartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,6 +128,7 @@ export default function TodoPage() {
   useEffect(() => {
     fetchBookings();
     fetchApartments();
+    fetchCurrentUserRole().then(setUserRole);
   }, []);
 
   const fetchBookings = async () => {
@@ -380,10 +383,12 @@ export default function TodoPage() {
             Track booking status and pending administrative tasks
           </p>
         </div>
-        <button onClick={handleExport} className="btn-secondary flex items-center gap-2">
-          <FileSpreadsheet size={18} />
-          Export
-        </button>
+        {userRole === 'admin' && (
+          <button onClick={handleExport} className="btn-secondary flex items-center gap-2">
+            <FileSpreadsheet size={18} />
+            Export
+          </button>
+        )}
       </div>
 
       {/* Workflow legend */}

@@ -10,12 +10,14 @@ import ApartmentChipFilter from '@/components/ApartmentChipFilter';
 import Switch from '@/components/Switch';
 import { getApartmentColorMap } from '@/lib/apartmentColors';
 import { fetchAllowedApartments, fetchAllApartments } from '@/lib/apartmentAccess';
+import { fetchCurrentUserRole } from '@/lib/userRole';
 import { exportToExcel } from '@/lib/exportExcel';
 import toast from 'react-hot-toast';
 
 type ViewMode = 'list' | 'calendar';
 
 export default function BookingsPage() {
+  const [userRole, setUserRole] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [showForm, setShowForm] = useState(false);
   const [editingBookingId, setEditingBookingId] = useState<string | undefined>(undefined);
@@ -39,6 +41,7 @@ export default function BookingsPage() {
     fetchBookings();
     fetchCalendarBookings();
     fetchApartments();
+    fetchCurrentUserRole().then(setUserRole);
   }, []);
 
   const fetchBookings = async () => {
@@ -199,10 +202,12 @@ export default function BookingsPage() {
           <p className="text-gray-600 mt-1">Manage accommodation reservations</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handleExport} className="btn-secondary flex items-center gap-2">
-            <FileSpreadsheet size={18} />
-            Export
-          </button>
+          {userRole === 'admin' && (
+            <button onClick={handleExport} className="btn-secondary flex items-center gap-2">
+              <FileSpreadsheet size={18} />
+              Export
+            </button>
+          )}
           <button onClick={handleNewBooking} className="btn-primary flex items-center gap-2">
             <Plus size={18} />
             New Booking
