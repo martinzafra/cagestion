@@ -729,6 +729,61 @@ export default function ReportsPage() {
                   </div>
                 </div>
 
+                {/* Key Metrics - scoped to the apartment/platform/period filters above */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                  <div className="card">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-600 text-sm">Total Bookings</p>
+                        <p className="text-3xl font-bold text-gray-900 mt-1">
+                          {apartmentReport.totalBookings}
+                        </p>
+                      </div>
+                      <BarChart3 size={40} className="text-blue-600 opacity-20" />
+                    </div>
+                  </div>
+
+                  <div className="card">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-600 text-sm">Total Revenue</p>
+                        <p className="text-3xl font-bold text-green-600 mt-1">
+                          {formatCurrency(apartmentReport.totalRevenue)}
+                        </p>
+                      </div>
+                      <DollarSign size={40} className="text-green-600 opacity-20" />
+                    </div>
+                  </div>
+
+                  <div className="card">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-600 text-sm">Total Expenses</p>
+                        <p className="text-3xl font-bold text-red-600 mt-1">
+                          {formatCurrency(apartmentReport.totalExpenses)}
+                        </p>
+                      </div>
+                      <TrendingUp size={40} className="text-red-600 opacity-20" />
+                    </div>
+                  </div>
+
+                  <div className="card">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-600 text-sm">Net Profit</p>
+                        <p
+                          className={`text-3xl font-bold mt-1 ${
+                            apartmentReport.netIncome >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}
+                        >
+                          {formatCurrency(apartmentReport.netIncome)}
+                        </p>
+                      </div>
+                      <BarChart3 size={40} className="text-gray-600 opacity-20" />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
                   <ReportKpiCard
                     label="Total Bookings"
