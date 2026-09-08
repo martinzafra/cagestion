@@ -291,6 +291,11 @@ export default function RevenuePage() {
       })
     : filteredRevenues;
 
+  // Mirrors revenue_invoicing's generated amount/amount_with_vat columns so
+  // the form previews the total before it's saved.
+  const commissionAmount = formData.total_services * (formData.commission_percentage / 100);
+  const totalAmount = Math.round((commissionAmount + (formData.vat || 0)) * 100) / 100;
+
   const SortableHeader: React.FC<{
     column: SortColumn;
     children: React.ReactNode;
@@ -360,18 +365,6 @@ export default function RevenuePage() {
                 </select>
               </div>
               <div>
-                <label className="label">Invoice #</label>
-                <input
-                  type="text"
-                  value={formData.invoice_number}
-                  onChange={(e) =>
-                    setFormData({ ...formData, invoice_number: e.target.value })
-                  }
-                  className="input"
-                  placeholder="e.g., 12 or C3"
-                />
-              </div>
-              <div>
                 <label className="label">Date *</label>
                 <input
                   type="date"
@@ -381,6 +374,18 @@ export default function RevenuePage() {
                   }
                   className="input"
                   required
+                />
+              </div>
+              <div>
+                <label className="label">Invoice #</label>
+                <input
+                  type="text"
+                  value={formData.invoice_number}
+                  onChange={(e) =>
+                    setFormData({ ...formData, invoice_number: e.target.value })
+                  }
+                  className="input"
+                  placeholder="e.g., 12 or C3"
                 />
               </div>
             </div>
@@ -431,7 +436,7 @@ export default function RevenuePage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div>
                 <label className="label">Invoice Item *</label>
                 <select
@@ -495,6 +500,16 @@ export default function RevenuePage() {
                     })
                   }
                   className="input"
+                  step="0.01"
+                />
+              </div>
+              <div>
+                <label className="label">Total Amount € (calculated)</label>
+                <input
+                  type="number"
+                  value={totalAmount}
+                  disabled
+                  className="input bg-gray-100 font-semibold"
                   step="0.01"
                 />
               </div>
