@@ -201,15 +201,9 @@ export default function RevenuePage() {
   };
 
   const apartmentColorMap = getApartmentColorMap(apartments);
-  const activeApartments = apartments.filter((a) => a.active !== false);
 
   const filteredRevenues = revenues.filter((rev) => {
-    // Inactive apartments have no filter chip to toggle, so their data
-    // always passes through rather than silently disappearing.
-    const apt = apartments.find((a) => a.id === rev.apartment_id);
-    const isActive = apt ? apt.active !== false : true;
-    if (isActive && apartments.length > 0 && !apartmentFilterIds.has(rev.apartment_id))
-      return false;
+    if (apartments.length > 0 && !apartmentFilterIds.has(rev.apartment_id)) return false;
     if (listFilters.revenue_type && rev.revenue_type !== listFilters.revenue_type) return false;
     if (listFilters.status === 'issued' && !rev.issued) return false;
     if (listFilters.status === 'draft' && rev.issued) return false;
@@ -559,7 +553,7 @@ export default function RevenuePage() {
             <div className="mb-3">
               <label className="text-xs text-gray-500 block mb-1.5">Apartment</label>
               <ApartmentChipFilter
-                apartments={activeApartments}
+                apartments={apartments}
                 selectedIds={apartmentFilterIds}
                 onToggle={toggleApartmentFilter}
                 colorMap={apartmentColorMap}
