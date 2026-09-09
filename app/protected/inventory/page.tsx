@@ -509,6 +509,7 @@ export default function InventoryPage() {
                           parseFloat(e.target.value) || 0
                         )
                       }
+                      onFocus={(e) => e.target.select()}
                       className="input text-base sm:text-sm"
                     />
                   </div>
