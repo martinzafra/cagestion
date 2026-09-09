@@ -202,7 +202,44 @@ const BookingForm: React.FC<BookingFormProps> = ({
 
       if (error) throw error;
       if (data) {
-        setFormData(data);
+        // Pick only the fields this form owns - select('*') also returns
+        // generated/read-only columns (nights, id, booking_id_number,
+        // inv_exp_done, ...) that would otherwise ride along in the update
+        // payload below and get rejected by Postgres (nights is
+        // GENERATED ALWAYS, so any explicit value in an UPDATE errors with
+        // 'column "nights" can only be updated to DEFAULT').
+        setFormData({
+          booking_date: data.booking_date,
+          booking_ref: data.booking_ref,
+          agent_id: data.agent_id,
+          apartment_id: data.apartment_id,
+          platform_id: data.platform_id,
+          status: data.status,
+          guest_name: data.guest_name,
+          guest_phone: data.guest_phone || '',
+          guest_email: data.guest_email || '',
+          check_in_date: data.check_in_date,
+          check_in_time: data.check_in_time || '',
+          check_out_date: data.check_out_date,
+          check_out_time: data.check_out_time || '',
+          number_of_guests: data.number_of_guests,
+          deposit: data.deposit,
+          deposit_amount: data.deposit_amount,
+          payment_type_id: data.payment_type_id,
+          comments: data.comments || '',
+          guest_comments: data.guest_comments || '',
+          daily_price: data.daily_price,
+          total_rent: data.total_rent,
+          cleaning_charge: data.cleaning_charge,
+          other_charge: data.other_charge,
+          guest_total_amount: data.guest_total_amount,
+          owners_booking: data.owners_booking,
+          police_registration: data.police_registration,
+          platform_invoice: data.platform_invoice,
+          platform_invoice_date: data.platform_invoice_date,
+          final_liquidation: data.final_liquidation,
+          final_liquidation_date: data.final_liquidation_date,
+        });
         if (data.check_in_date && data.check_out_date) {
           const checkIn = new Date(data.check_in_date);
           const checkOut = new Date(data.check_out_date);
@@ -530,6 +567,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
             name="number_of_guests"
             value={formData.number_of_guests}
             onChange={handleChange}
+            onFocus={(e) => e.target.select()}
             min="1"
             className="input"
           />
@@ -564,6 +602,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
             name="deposit_amount"
             value={formData.deposit_amount || ''}
             onChange={handleChange}
+            onFocus={(e) => e.target.select()}
             disabled={formData.deposit !== 'Y'}
             className="input"
             step="0.01"
@@ -622,6 +661,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
             name="daily_price"
             value={formData.daily_price}
             onChange={handleChange}
+            onFocus={(e) => e.target.select()}
             className={`input ${formData.owners_booking || priceMode === 'total' ? 'bg-gray-100' : ''}`}
             step="0.01"
             required={!formData.owners_booking && priceMode === 'daily'}
@@ -638,6 +678,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
             name="total_rent"
             value={formData.total_rent ?? ''}
             onChange={handleChange}
+            onFocus={(e) => e.target.select()}
             className={`input ${formData.owners_booking || priceMode === 'daily' ? 'bg-gray-100' : ''}`}
             step="0.01"
             required={!formData.owners_booking && priceMode === 'total'}
@@ -652,6 +693,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
             name="cleaning_charge"
             value={formData.cleaning_charge}
             onChange={handleChange}
+            onFocus={(e) => e.target.select()}
             className="input"
             step="0.01"
           />
@@ -668,6 +710,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
             name="other_charge"
             value={formData.other_charge}
             onChange={handleChange}
+            onFocus={(e) => e.target.select()}
             className="input"
             step="0.01"
           />
