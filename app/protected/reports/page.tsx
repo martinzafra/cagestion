@@ -261,7 +261,7 @@ export default function ReportsPage() {
         .select(
           'id, check_in_date, check_out_date, owners_booking, cleaning_charge, other_charge, guest_total_amount, total_rent, platform:inventory_platforms(name)'
         )
-        .in('status', ['FINISHED', 'CANCELLED'])
+        .in('status', ['CONFIRMED', 'DONE', 'FINISHED', 'CANCELLED'])
         .lte('check_in_date', elapsedEnd)
         .gt('check_out_date', start);
       if (!isAggregate) bookingsQuery = bookingsQuery.eq('apartment_id', selectedApartmentId);
@@ -453,7 +453,7 @@ export default function ReportsPage() {
           platform:inventory_platforms(name),
           payment_type:inventory_payment_types(name)`
         )
-        .in('status', ['FINISHED', 'CANCELLED'])
+        .in('status', ['CONFIRMED', 'DONE', 'FINISHED', 'CANCELLED'])
         .lte('check_in_date', elapsedEnd)
         .gt('check_out_date', start);
       if (!isAggregate) bookingsQuery = bookingsQuery.eq('apartment_id', selectedApartmentId);
