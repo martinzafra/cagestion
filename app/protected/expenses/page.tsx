@@ -452,7 +452,7 @@ export default function ExpensesPage() {
                 >
                   <option value="INVOICE">Invoice</option>
                   <option value="PAYMENT">Payment</option>
-                  <option value="PLATFORM INV.">Platform Inv.</option>
+                  <option value="PLATFORM INV.">Owner's Expense</option>
                 </select>
               </div>
               <div>
@@ -714,7 +714,7 @@ export default function ExpensesPage() {
                 <option value="">All Types</option>
                 <option value="INVOICE">Invoice</option>
                 <option value="PAYMENT">Payment</option>
-                <option value="PLATFORM INV.">Platform Inv.</option>
+                <option value="PLATFORM INV.">Owner's Expense</option>
               </select>
               <select
                 value={listFilters.expense_category_id}
