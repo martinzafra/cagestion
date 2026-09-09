@@ -426,8 +426,7 @@ export default function RevenuePage() {
                     .filter(
                       (b) =>
                         (!formData.apartment_id || b.apartment_id === formData.apartment_id) &&
-                        ((b.status !== 'FINISHED' && b.status !== 'CANCELLED') ||
-                          b.id === formData.booking_id)
+                        (b.status !== 'CANCELLED' || b.id === formData.booking_id)
                     )
                     .map((b) => (
                       <option key={b.id} value={b.id}>
@@ -469,6 +468,7 @@ export default function RevenuePage() {
                       total_services: parseFloat(e.target.value) || 0,
                     })
                   }
+                  onFocus={(e) => e.target.select()}
                   className="input"
                   step="0.01"
                 />
@@ -485,6 +485,7 @@ export default function RevenuePage() {
                       commission_percentage: parseFloat(e.target.value) || 0,
                     })
                   }
+                  onFocus={(e) => e.target.select()}
                   className="input"
                   step="0.01"
                 />
@@ -511,6 +512,7 @@ export default function RevenuePage() {
                       vat: parseFloat(e.target.value) || 0,
                     })
                   }
+                  onFocus={(e) => e.target.select()}
                   className="input"
                   step="0.01"
                 />
