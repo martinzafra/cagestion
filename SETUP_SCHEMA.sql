@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS expenses (
   total DECIMAL(10, 2) GENERATED ALWAYS AS (
     amount + COALESCE(vat, 0)
   ) STORED,
-  apartment_id UUID NOT NULL REFERENCES inventory_apartments(id),
+  apartment_id UUID REFERENCES inventory_apartments(id),
   booking_id UUID REFERENCES bookings(id),
   attachment_url TEXT,
   comments TEXT,
