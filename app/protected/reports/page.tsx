@@ -14,6 +14,7 @@ import {
 import toast from 'react-hot-toast';
 import { formatCurrency, formatDate } from '@/lib/calculations';
 import { exportToExcel } from '@/lib/exportExcel';
+import Switch from '@/components/Switch';
 
 // ---- Apartment Annual Report -----------------------------------------
 // The report year runs from the apartment's contract anniversary date, not
@@ -78,6 +79,30 @@ interface ApartmentReportData {
   availablePlatforms: string[];
 }
 
+interface PlatformRow {
+  platform: string;
+  totalBookings: number;
+  nights: number;
+  avgLengthOfStay: number;
+  totalRevenue: number;
+  commission: number;
+  caOther: number;
+  totalExpenses: number;
+  netIncome: number;
+  adr: number;
+}
+
+interface PlatformAnalysisData {
+  apartmentName: string;
+  periodStart: string;
+  periodEnd: string;
+  isInProgress: boolean;
+  usingCalendarFallback: boolean;
+  pctComplete: number;
+  rows: PlatformRow[];
+  totals: PlatformRow;
+}
+
 function ReportKpiCard({
   label,
   value,
@@ -123,9 +148,17 @@ export default function ReportsPage() {
   const [selectedApartmentId, setSelectedApartmentId] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [periodOffset, setPeriodOffset] = useState(0);
+  // Only FINISHED/CANCELLED bookings count by default - a booking still in
+  // progress (CONFIRMED/DONE) isn't settled yet, so its figures could still
+  // change before it's liquidated.
+  const [showConfirmedDone, setShowConfirmedDone] = useState(false);
   const [apartmentReport, setApartmentReport] = useState<ApartmentReportData | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [exportingBookings, setExportingBookings] = useState(false);
+
+  const [activeReportTab, setActiveReportTab] = useState<'annual' | 'platform'>('annual');
+  const [platformAnalysis, setPlatformAnalysis] = useState<PlatformAnalysisData | null>(null);
+  const [platformAnalysisLoading, setPlatformAnalysisLoading] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -149,7 +182,13 @@ export default function ReportsPage() {
     } else {
       setApartmentReport(null);
     }
-  }, [selectedApartmentId, periodOffset, selectedPlatform]);
+  }, [selectedApartmentId, periodOffset, selectedPlatform, showConfirmedDone]);
+
+  useEffect(() => {
+    if (activeReportTab === 'platform' && selectedApartmentId) {
+      fetchPlatformAnalysis();
+    }
+  }, [activeReportTab, selectedApartmentId, periodOffset, showConfirmedDone]);
 
   const checkAuth = async () => {
     try {
@@ -261,7 +300,7 @@ export default function ReportsPage() {
         .select(
           'id, check_in_date, check_out_date, owners_booking, cleaning_charge, other_charge, guest_total_amount, total_rent, platform:inventory_platforms(name)'
         )
-        .in('status', ['CONFIRMED', 'DONE', 'FINISHED', 'CANCELLED'])
+        .in('status', showConfirmedDone ? ['CONFIRMED', 'DONE', 'FINISHED', 'CANCELLED'] : ['FINISHED', 'CANCELLED'])
         .lte('check_in_date', elapsedEnd)
         .gt('check_out_date', start);
       if (!isAggregate) bookingsQuery = bookingsQuery.eq('apartment_id', selectedApartmentId);
@@ -426,6 +465,223 @@ export default function ReportsPage() {
     }
   };
 
+  // Platform Analysis: the same apartment/period scope as the Annual
+  // Report, but broken out per platform instead of filtered to one -
+  // reuses the exact same KPI formulas, just grouped differently.
+  const fetchPlatformAnalysis = async () => {
+    const isAll = selectedApartmentId === 'ALL';
+    const isAllActive = selectedApartmentId === 'ALL_ACTIVE';
+    const isAggregate = isAll || isAllActive;
+    const apt = isAggregate ? null : apartments.find((a) => a.id === selectedApartmentId);
+    if (!isAggregate && !apt) return;
+
+    const activeApartments = apartments.filter((a) => a.active !== false);
+    const activeApartmentIds = activeApartments.map((a) => a.id);
+
+    setPlatformAnalysisLoading(true);
+    try {
+      const { start, end, usingCalendarFallback } = getPeriodBounds(
+        isAggregate ? null : apt!.contract_date,
+        periodOffset
+      );
+      const todayISO = new Date().toISOString().split('T')[0];
+      const isInProgress = todayISO < end;
+      const elapsedEnd = isInProgress ? todayISO : end;
+      const elapsedDays = daysBetween(start, elapsedEnd);
+      const totalDays = daysBetween(start, end);
+
+      let bookingsQuery = supabase
+        .from('bookings')
+        .select(
+          'id, check_in_date, check_out_date, owners_booking, cleaning_charge, other_charge, guest_total_amount, total_rent, platform:inventory_platforms(name)'
+        )
+        .in('status', showConfirmedDone ? ['CONFIRMED', 'DONE', 'FINISHED', 'CANCELLED'] : ['FINISHED', 'CANCELLED'])
+        .lte('check_in_date', elapsedEnd)
+        .gt('check_out_date', start);
+      if (!isAggregate) bookingsQuery = bookingsQuery.eq('apartment_id', selectedApartmentId);
+      else if (isAllActive) bookingsQuery = bookingsQuery.in('apartment_id', activeApartmentIds);
+
+      const bookingsRes = await bookingsQuery;
+      if (bookingsRes.error) throw bookingsRes.error;
+      const allBookings: any[] = bookingsRes.data || [];
+      const allBookingIds = new Set(allBookings.map((b) => b.id));
+
+      let revenueQuery = supabase
+        .from('revenue_invoicing')
+        .select('amount, amount_with_vat, booking_id, item:inventory_invoice_items(name)')
+        .gte('revenue_date', start)
+        .lte('revenue_date', elapsedEnd);
+      if (!isAggregate) revenueQuery = revenueQuery.eq('apartment_id', selectedApartmentId);
+      else if (isAllActive) revenueQuery = revenueQuery.in('apartment_id', activeApartmentIds);
+
+      let expensesQuery = supabase
+        .from('expenses')
+        .select('total, amount, booking_id, category:inventory_expense_types(name)')
+        .gte('expense_date', start)
+        .lte('expense_date', elapsedEnd);
+      if (!isAggregate) expensesQuery = expensesQuery.eq('apartment_id', selectedApartmentId);
+      else if (isAllActive) expensesQuery = expensesQuery.in('apartment_id', activeApartmentIds);
+
+      const [revenueRes, expensesRes] = await Promise.all([revenueQuery, expensesQuery]);
+      if (revenueRes.error) throw revenueRes.error;
+      if (expensesRes.error) throw expensesRes.error;
+
+      const revenue = (revenueRes.data || []).filter(
+        (r: any) => !r.booking_id || allBookingIds.has(r.booking_id)
+      );
+      const expenses = (expensesRes.data || []).filter(
+        (e: any) => !e.booking_id || allBookingIds.has(e.booking_id)
+      );
+
+      const byPlatform = new Map<string, any[]>();
+      allBookings.forEach((b) => {
+        const name = b.platform?.name || 'Other';
+        if (!byPlatform.has(name)) byPlatform.set(name, []);
+        byPlatform.get(name)!.push(b);
+      });
+
+      const buildRow = (platformName: string, bookings: any[]): PlatformRow => {
+        const bookingIds = new Set(bookings.map((b) => b.id));
+        let occupiedNights = 0;
+        let revenueNights = 0;
+        bookings.forEach((b) => {
+          const overlapStart = b.check_in_date > start ? b.check_in_date : start;
+          const overlapEnd = b.check_out_date < elapsedEnd ? b.check_out_date : elapsedEnd;
+          const nights = daysBetween(overlapStart, overlapEnd);
+          if (nights > 0) {
+            occupiedNights += nights;
+            if (!b.owners_booking) revenueNights += nights;
+          }
+        });
+
+        const totalRevenue = bookings.reduce(
+          (sum, b) =>
+            sum + ((b.guest_total_amount || 0) - (b.cleaning_charge || 0) - (b.other_charge || 0)),
+          0
+        );
+        const platformRevenue = revenue.filter((r: any) => r.booking_id && bookingIds.has(r.booking_id));
+        const commission = platformRevenue
+          .filter((r: any) => r.item?.name === 'Commission')
+          .reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
+        const commissionWithVat = platformRevenue
+          .filter((r: any) => r.item?.name === 'Commission')
+          .reduce((sum: number, r: any) => sum + (r.amount_with_vat || 0), 0);
+        const platformExpenses = expenses.filter((e: any) => e.booking_id && bookingIds.has(e.booking_id));
+        const platformInvoiceWithVat = platformExpenses
+          .filter((e: any) => e.category?.name === 'Platform Invoice')
+          .reduce((sum: number, e: any) => sum + (e.total || 0), 0);
+        const cleaningChargeTotal = bookings.reduce((sum, b) => sum + (b.cleaning_charge || 0), 0);
+        const cleaningLaundryExpenses = platformExpenses
+          .filter((e: any) => ['Cleaning', 'Laundry'].includes(e.category?.name))
+          .reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
+        const caOther = cleaningChargeTotal - cleaningLaundryExpenses;
+        const totalExpenses = commissionWithVat + platformInvoiceWithVat;
+        const netIncome = totalRevenue - totalExpenses;
+        const adr = revenueNights > 0 ? totalRevenue / revenueNights : 0;
+        const avgLengthOfStay = bookings.length > 0 ? occupiedNights / bookings.length : 0;
+
+        return {
+          platform: platformName,
+          totalBookings: bookings.length,
+          nights: occupiedNights,
+          avgLengthOfStay,
+          totalRevenue,
+          commission,
+          caOther,
+          totalExpenses,
+          netIncome,
+          adr,
+        };
+      };
+
+      const rows = Array.from(byPlatform.entries())
+        .map(([name, bookings]) => buildRow(name, bookings))
+        .sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+      // General (apartment-level, not tied to a specific booking) revenue/
+      // expenses can't be attributed to a platform - without this row the
+      // table's total would silently fall short of the Annual Report's
+      // aggregate whenever one exists.
+      const generalRevenue = revenue.filter((r: any) => !r.booking_id);
+      const generalExpenses = expenses.filter((e: any) => !e.booking_id);
+      const generalCommission = generalRevenue
+        .filter((r: any) => r.item?.name === 'Commission')
+        .reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
+      const generalCommissionWithVat = generalRevenue
+        .filter((r: any) => r.item?.name === 'Commission')
+        .reduce((sum: number, r: any) => sum + (r.amount_with_vat || 0), 0);
+      const generalPlatformInvoiceWithVat = generalExpenses
+        .filter((e: any) => e.category?.name === 'Platform Invoice')
+        .reduce((sum: number, e: any) => sum + (e.total || 0), 0);
+      const generalTotalExpenses = generalCommissionWithVat + generalPlatformInvoiceWithVat;
+      if (generalCommission !== 0 || generalTotalExpenses !== 0) {
+        rows.push({
+          platform: 'General (not booking-specific)',
+          totalBookings: 0,
+          nights: 0,
+          avgLengthOfStay: 0,
+          totalRevenue: 0,
+          commission: generalCommission,
+          caOther: 0,
+          totalExpenses: generalTotalExpenses,
+          netIncome: -generalTotalExpenses,
+          adr: 0,
+        });
+      }
+
+      const totals = rows.reduce(
+        (acc, r) => ({
+          platform: 'All Platforms',
+          totalBookings: acc.totalBookings + r.totalBookings,
+          nights: acc.nights + r.nights,
+          avgLengthOfStay: 0,
+          totalRevenue: acc.totalRevenue + r.totalRevenue,
+          commission: acc.commission + r.commission,
+          caOther: acc.caOther + r.caOther,
+          totalExpenses: acc.totalExpenses + r.totalExpenses,
+          netIncome: acc.netIncome + r.netIncome,
+          adr: 0,
+        }),
+        {
+          platform: 'All Platforms',
+          totalBookings: 0,
+          nights: 0,
+          avgLengthOfStay: 0,
+          totalRevenue: 0,
+          commission: 0,
+          caOther: 0,
+          totalExpenses: 0,
+          netIncome: 0,
+          adr: 0,
+        }
+      );
+      totals.avgLengthOfStay = totals.totalBookings > 0 ? totals.nights / totals.totalBookings : 0;
+      let allRevenueNights = 0;
+      allBookings.forEach((b) => {
+        const overlapStart = b.check_in_date > start ? b.check_in_date : start;
+        const overlapEnd = b.check_out_date < elapsedEnd ? b.check_out_date : elapsedEnd;
+        const nights = daysBetween(overlapStart, overlapEnd);
+        if (nights > 0 && !b.owners_booking) allRevenueNights += nights;
+      });
+      totals.adr = allRevenueNights > 0 ? totals.totalRevenue / allRevenueNights : 0;
+
+      setPlatformAnalysis({
+        apartmentName: isAll ? 'All Apartments' : isAllActive ? 'All Active Apartments' : apt!.name,
+        periodStart: start,
+        periodEnd: end,
+        isInProgress,
+        usingCalendarFallback,
+        pctComplete: totalDays > 0 ? Math.min(100, Math.round((elapsedDays / totalDays) * 100)) : 100,
+        rows,
+        totals,
+      });
+    } catch (error) {
+      toast.error('Failed to load platform analysis');
+    } finally {
+      setPlatformAnalysisLoading(false);
+    }
+  };
+
   const handleExportBookingsReport = async () => {
     if (!apartmentReport) return;
 
@@ -453,7 +709,7 @@ export default function ReportsPage() {
           platform:inventory_platforms(name),
           payment_type:inventory_payment_types(name)`
         )
-        .in('status', ['CONFIRMED', 'DONE', 'FINISHED', 'CANCELLED'])
+        .in('status', showConfirmedDone ? ['CONFIRMED', 'DONE', 'FINISHED', 'CANCELLED'] : ['FINISHED', 'CANCELLED'])
         .lte('check_in_date', elapsedEnd)
         .gt('check_out_date', start);
       if (!isAggregate) bookingsQuery = bookingsQuery.eq('apartment_id', selectedApartmentId);
@@ -615,6 +871,33 @@ export default function ReportsPage() {
         <p className="text-gray-600 mt-1">Property management insights and statistics</p>
       </div>
 
+      {/* Report picker */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setActiveReportTab('annual')}
+            className={activeReportTab === 'annual' ? 'btn-primary' : 'btn-secondary'}
+          >
+            Annual Report
+          </button>
+          <button
+            onClick={() => setActiveReportTab('platform')}
+            className={activeReportTab === 'platform' ? 'btn-primary' : 'btn-secondary'}
+          >
+            Platform Analysis
+          </button>
+        </div>
+        <Switch
+          checked={showConfirmedDone}
+          onChange={setShowConfirmedDone}
+          className="flex items-center gap-2.5 text-sm text-gray-800"
+        >
+          Show also CONFIRMED/DONE Bookings
+        </Switch>
+      </div>
+
+      {activeReportTab === 'annual' && (
+        <>
       {/* Apartment Annual Report */}
       <div className="card">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
@@ -979,6 +1262,152 @@ export default function ReportsPage() {
             </div>
           </div>
         </>
+      )}
+        </>
+      )}
+
+      {activeReportTab === 'platform' && (
+        <div className="card">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+            <h2 className="text-xl font-bold text-gray-900">Platform Analysis</h2>
+            <select
+              value={selectedApartmentId}
+              onChange={(e) => {
+                setSelectedApartmentId(e.target.value);
+                setPeriodOffset(0);
+              }}
+              className="select"
+            >
+              <option value="ALL_ACTIVE">All Active Apartments</option>
+              <option value="ALL">All Apartments</option>
+              {apartments.map((apt) => (
+                <option key={apt.id} value={apt.id}>
+                  {apt.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {platformAnalysisLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : platformAnalysis ? (
+            <>
+              <div className="flex flex-wrap items-center gap-3 mb-6 pb-4 border-b">
+                <button
+                  onClick={() => setPeriodOffset((p) => p - 1)}
+                  className="p-2 hover:bg-gray-100 rounded"
+                  title="Previous period"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <div className="text-sm font-medium text-gray-900">
+                  {formatDate(platformAnalysis.periodStart)} &ndash; {formatDate(platformAnalysis.periodEnd)}
+                </div>
+                <button
+                  onClick={() => setPeriodOffset((p) => p + 1)}
+                  className="p-2 hover:bg-gray-100 rounded"
+                  title="Next period"
+                  disabled={periodOffset >= 0 && !platformAnalysis.isInProgress}
+                >
+                  <ChevronRight size={18} />
+                </button>
+                {platformAnalysis.isInProgress ? (
+                  <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    In progress &mdash; {platformAnalysis.pctComplete}% through period
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-700">
+                    Completed
+                  </span>
+                )}
+                {platformAnalysis.usingCalendarFallback && (
+                  <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                    No contract date set &mdash; showing calendar year
+                  </span>
+                )}
+                {periodOffset !== 0 && (
+                  <button
+                    onClick={() => setPeriodOffset(0)}
+                    className="text-sm text-blue-600 hover:underline ml-auto"
+                  >
+                    Back to current period
+                  </button>
+                )}
+              </div>
+
+              {platformAnalysis.rows.length === 0 ? (
+                <p className="text-center py-8 text-gray-500">No bookings in this period</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Platform</th>
+                        <th className="text-right">Bookings</th>
+                        <th className="text-right">Nights</th>
+                        <th className="text-right">Avg. Length of Stay</th>
+                        <th className="text-right">Total Revenue</th>
+                        <th className="text-right">CA Commission</th>
+                        <th className="text-right">CA Other</th>
+                        <th className="text-right">Total Expenses</th>
+                        <th className="text-right">Net Income</th>
+                        <th className="text-right">Average Daily Rate</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {platformAnalysis.rows.map((row) => (
+                        <tr key={row.platform}>
+                          <td className="font-medium">{row.platform}</td>
+                          <td className="text-right">{row.totalBookings}</td>
+                          <td className="text-right">{row.nights}</td>
+                          <td className="text-right">{row.avgLengthOfStay.toFixed(1)}</td>
+                          <td className="text-right text-green-600">{formatCurrency(row.totalRevenue)}</td>
+                          <td className="text-right">{formatCurrency(row.commission)}</td>
+                          <td className="text-right">{formatCurrency(row.caOther)}</td>
+                          <td className="text-right text-red-600">{formatCurrency(row.totalExpenses)}</td>
+                          <td
+                            className={`text-right font-semibold ${
+                              row.netIncome >= 0 ? 'text-green-600' : 'text-red-600'
+                            }`}
+                          >
+                            {formatCurrency(row.netIncome)}
+                          </td>
+                          <td className="text-right">{formatCurrency(row.adr)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="font-semibold border-t-2">
+                        <td>All Platforms</td>
+                        <td className="text-right">{platformAnalysis.totals.totalBookings}</td>
+                        <td className="text-right">{platformAnalysis.totals.nights}</td>
+                        <td className="text-right">{platformAnalysis.totals.avgLengthOfStay.toFixed(1)}</td>
+                        <td className="text-right text-green-600">
+                          {formatCurrency(platformAnalysis.totals.totalRevenue)}
+                        </td>
+                        <td className="text-right">{formatCurrency(platformAnalysis.totals.commission)}</td>
+                        <td className="text-right">{formatCurrency(platformAnalysis.totals.caOther)}</td>
+                        <td className="text-right text-red-600">
+                          {formatCurrency(platformAnalysis.totals.totalExpenses)}
+                        </td>
+                        <td
+                          className={`text-right ${
+                            platformAnalysis.totals.netIncome >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}
+                        >
+                          {formatCurrency(platformAnalysis.totals.netIncome)}
+                        </td>
+                        <td className="text-right">{formatCurrency(platformAnalysis.totals.adr)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </>
+          ) : null}
+        </div>
       )}
     </div>
   );
