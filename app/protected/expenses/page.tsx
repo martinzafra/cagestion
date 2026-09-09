@@ -23,8 +23,14 @@ type SortColumn =
   | 'total'
   | 'guest_name';
 
+// Display text for the grid - the underlying expense_type value stays
+// OWNERS EXPENSE (a plain enum literal can't hold an apostrophe).
+const EXPENSE_TYPE_LABELS: Record<string, string> = {
+  'OWNERS EXPENSE': "Owner's Expense",
+};
+
 const blankFormData = {
-  expense_type: 'INVOICE' as 'INVOICE' | 'PAYMENT' | 'PLATFORM INV.',
+  expense_type: 'INVOICE' as 'INVOICE' | 'PAYMENT' | 'OWNERS EXPENSE',
   expense_category_id: '',
   vendor: '',
   expense_date: new Date().toISOString().split('T')[0],
@@ -445,14 +451,14 @@ export default function ExpensesPage() {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      expense_type: e.target.value as 'INVOICE' | 'PAYMENT' | 'PLATFORM INV.',
+                      expense_type: e.target.value as 'INVOICE' | 'PAYMENT' | 'OWNERS EXPENSE',
                     })
                   }
                   className="select"
                 >
                   <option value="INVOICE">Invoice</option>
                   <option value="PAYMENT">Payment</option>
-                  <option value="PLATFORM INV.">Owner's Expense</option>
+                  <option value="OWNERS EXPENSE">Owner's Expense</option>
                 </select>
               </div>
               <div>
@@ -714,7 +720,7 @@ export default function ExpensesPage() {
                 <option value="">All Types</option>
                 <option value="INVOICE">Invoice</option>
                 <option value="PAYMENT">Payment</option>
-                <option value="PLATFORM INV.">Owner's Expense</option>
+                <option value="OWNERS EXPENSE">Owner's Expense</option>
               </select>
               <select
                 value={listFilters.expense_category_id}
@@ -780,7 +786,7 @@ export default function ExpensesPage() {
               ) : (
                 sortedExpenses.map((exp) => (
                   <tr key={exp.id}>
-                    <td className="text-sm">{exp.expense_type}</td>
+                    <td className="text-sm">{EXPENSE_TYPE_LABELS[exp.expense_type] || exp.expense_type}</td>
                     <td>{exp.category?.name}</td>
                     <td className="font-medium">{exp.vendor}</td>
                     <td>{formatDate(exp.expense_date)}</td>
