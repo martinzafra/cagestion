@@ -107,7 +107,13 @@ export default function ExpensesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.apartment_id || !formData.expense_category_id || !formData.vendor) {
+    // Apartment is required unless this is a General Expense (no booking
+    // allocation) - a truly general cost isn't tied to any one property.
+    if (
+      (formData.booking_id && !formData.apartment_id) ||
+      !formData.expense_category_id ||
+      !formData.vendor
+    ) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -131,7 +137,7 @@ export default function ExpensesPage() {
         invoice_number: formData.invoice_number || null,
         amount: formData.amount,
         vat: formData.vat || 0,
-        apartment_id: formData.apartment_id,
+        apartment_id: formData.apartment_id || null,
         booking_id: formData.booking_id || null,
         comments: formData.comments || null,
         attachment_url: formData.attachment_url || null,
@@ -195,7 +201,7 @@ export default function ExpensesPage() {
       invoice_number: exp.invoice_number || '',
       amount: exp.amount,
       vat: exp.vat || 0,
-      apartment_id: exp.apartment_id,
+      apartment_id: exp.apartment_id || '',
       booking_id: exp.booking_id || '',
       comments: exp.comments || '',
       attachment_url: exp.attachment_url || '',
@@ -487,6 +493,7 @@ export default function ExpensesPage() {
                       amount: parseFloat(e.target.value) || 0,
                     })
                   }
+                  onFocus={(e) => e.target.select()}
                   className="input"
                   step="0.01"
                   required
@@ -501,6 +508,7 @@ export default function ExpensesPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, vat: parseFloat(e.target.value) || 0 })
                   }
+                  onFocus={(e) => e.target.select()}
                   className="input"
                   step="0.01"
                 />
@@ -520,16 +528,18 @@ export default function ExpensesPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="label">Apartment *</label>
+                <label className="label">Apartment{formData.booking_id ? ' *' : ''}</label>
                 <select
                   value={formData.apartment_id}
                   onChange={(e) =>
                     setFormData({ ...formData, apartment_id: e.target.value })
                   }
                   className="select"
-                  required
+                  required={!!formData.booking_id}
                 >
-                  <option value="">Select Apartment</option>
+                  <option value="">
+                    {formData.booking_id ? 'Select Apartment' : 'General (no apartment)'}
+                  </option>
                   {apartments.map((apt) => (
                     <option key={apt.id} value={apt.id}>
                       {apt.name}
@@ -551,8 +561,7 @@ export default function ExpensesPage() {
                     .filter(
                       (b) =>
                         (!formData.apartment_id || b.apartment_id === formData.apartment_id) &&
-                        ((b.status !== 'FINISHED' && b.status !== 'CANCELLED') ||
-                          b.id === formData.booking_id)
+                        (b.status !== 'CANCELLED' || b.id === formData.booking_id)
                     )
                     .map((b) => (
                       <option key={b.id} value={b.id}>
@@ -749,7 +758,7 @@ export default function ExpensesPage() {
                     <td>{exp.category?.name}</td>
                     <td className="font-medium">{exp.vendor}</td>
                     <td>{formatDate(exp.expense_date)}</td>
-                    <td>{exp.apartment?.name}</td>
+                    <td>{exp.apartment?.name || 'General'}</td>
                     <td className="text-right">{formatCurrency(exp.amount)}</td>
                     <td className="text-right">{formatCurrency(exp.vat)}</td>
                     <td className="font-semibold text-right">{formatCurrency(exp.total)}</td>
