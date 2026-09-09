@@ -260,7 +260,7 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
                   <p className="font-medium">{booking.police_registration}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Platform Invoice</p>
+                  <p className="text-sm text-gray-600">Owner Invoice</p>
                   <p className="font-medium">{booking.platform_invoice}</p>
                 </div>
                 {booking.comments && (

@@ -576,7 +576,7 @@ export default function ReportsPage() {
         { header: 'Deposit', value: (b) => b.deposit },
         { header: 'Deposit Amount', value: (b) => b.deposit_amount },
         { header: 'Payment Type', value: (b) => b.payment_type?.name },
-        { header: 'Platform Invoice', value: (b) => b.platform_invoice },
+        { header: 'Owner Invoice', value: (b) => b.platform_invoice },
         { header: 'Final Liquidation', value: (b) => b.final_liquidation },
         { header: 'Inv & Exp Done', value: (b) => (b.inv_exp_done ? 'Yes' : 'No') },
         { header: 'Price Basis', value: (b) => b.price_basis },

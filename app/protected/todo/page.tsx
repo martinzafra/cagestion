@@ -54,7 +54,7 @@ const WORKFLOW_PHASES: { key: string; label: string; bg: string; text: string }[
   { key: 'CONFIRMED', label: 'CONFIRMED', bg: '#DCFCE7', text: '#166534' },
   { key: 'CHECK IN', label: 'CHECKED IN', bg: '#CCFBF1', text: '#115E59' },
   { key: 'CHECK OUT', label: 'CHECKED OUT', bg: '#E0F2FE', text: '#075985' },
-  { key: 'TO INV/EXP', label: 'TO DO INV/EXP', bg: '#EEE9F4', text: '#582294' },
+  { key: 'TO INV/EXP', label: 'INPUT EXP.', bg: '#EEE9F4', text: '#582294' },
   { key: 'COMPLETED', label: 'COMPLETED', bg: '#FAE6F5', text: '#7A1763' },
 ];
 // Keyed lookups for the grid's "To Do Status" badge and row tint - key is
@@ -207,11 +207,10 @@ export default function TodoPage() {
       { header: 'Check-out Date', value: (b) => b.check_out_date },
       { header: 'Police Registration', value: (b) => b.police_registration },
       { header: 'Police Registration Photo', value: (b) => (b.police_registration_file ? 'Yes' : 'No') },
-      { header: 'Platform Invoice', value: (b) => b.platform_invoice },
-      { header: 'Platform Invoice Date', value: (b) => b.platform_invoice_date },
-      { header: 'Owner Liquidation', value: (b) => b.final_liquidation },
-      { header: 'Owner Liquidation Date', value: (b) => b.final_liquidation_date },
-      { header: 'Inv & Exp Done', value: (b) => (b.inv_exp_done ? 'Yes' : 'No') },
+      { header: 'Owner Invoice', value: (b) => b.platform_invoice },
+      { header: 'CA Inv and Liquidation', value: (b) => b.final_liquidation },
+      { header: 'CA Inv and Liquidation Date', value: (b) => b.final_liquidation_date },
+      { header: 'Exp Done', value: (b) => (b.inv_exp_done ? 'Yes' : 'No') },
     ]);
   };
 
@@ -451,7 +450,7 @@ export default function TodoPage() {
             <option value="CONFIRMED">Confirmed</option>
             <option value="CHECK IN">Checked In</option>
             <option value="CHECK OUT">Checked Out</option>
-            <option value="TO INV/EXP">To Do Inv/Exp</option>
+            <option value="TO INV/EXP">Input Exp.</option>
             <option value="COMPLETED">Completed</option>
           </select>
           <select
@@ -471,7 +470,7 @@ export default function TodoPage() {
             onChange={(e) => setFilters({ ...filters, platform_invoice: e.target.value })}
             className="select"
           >
-            <option value="">Platform Invoice: All</option>
+            <option value="">Owner Invoice: All</option>
             <option value="TO BE DONE">To Be Done</option>
             <option value="SENT">Sent</option>
             <option value="NA">N/A</option>
@@ -483,7 +482,7 @@ export default function TodoPage() {
             }
             className="select"
           >
-            <option value="">Owner Liquidation: All</option>
+            <option value="">CA Inv and Liquidation: All</option>
             <option value="TO BE DONE">To Be Done</option>
             <option value="SENT">Sent</option>
             <option value="NA">N/A</option>
@@ -512,7 +511,7 @@ export default function TodoPage() {
               <col className="w-[80px]" />
               <col className="w-[165px]" />
               <col className="w-[150px]" />
-              <col className="w-[150px]" />
+              <col className="w-[90px]" />
               <col className="w-[150px]" />
               <col className="w-[150px]" />
             </colgroup>
@@ -524,9 +523,9 @@ export default function TodoPage() {
                 <SortableHeader column="check_out_date">Check-out</SortableHeader>
                 <SortableHeader column="todo_status">To Do Status</SortableHeader>
                 <SortableHeader column="police_registration" align="center">Police Registration</SortableHeader>
-                <SortableHeader column="platform_invoice" align="center">Platform Invoice</SortableHeader>
-                <SortableHeader column="final_liquidation" align="center">Owner Liquidation</SortableHeader>
-                <th className="!text-center">Inv &amp; Exp</th>
+                <SortableHeader column="platform_invoice" align="center">Owner Invoice</SortableHeader>
+                <SortableHeader column="final_liquidation" align="center">CA Inv and Liquidation</SortableHeader>
+                <th className="!text-center">Exp</th>
               </tr>
             </thead>
             <tbody>
@@ -617,34 +616,19 @@ export default function TodoPage() {
                           )}
                         </div>
                       </td>
-                      <td>
-                        <div className="flex gap-1.5 items-center justify-center">
-                          <StatusSquare
-                            value={b.platform_invoice}
-                            doneValue="SENT"
-                            onChange={(value) =>
-                              handleTaskStatusChange(
-                                b,
-                                'platform_invoice',
-                                'platform_invoice_date',
-                                value
-                              )
-                            }
-                          />
-                          <input
-                            type="date"
-                            value={b.platform_invoice_date || ''}
-                            onChange={(e) =>
-                              handleDateChange(
-                                b.id,
-                                'platform_invoice_date',
-                                e.target.value
-                              )
-                            }
-                            disabled={b.platform_invoice !== 'SENT'}
-                            className="input w-28 text-base sm:text-xs px-1.5 py-1"
-                          />
-                        </div>
+                      <td className="text-center">
+                        <StatusSquare
+                          value={b.platform_invoice}
+                          doneValue="SENT"
+                          onChange={(value) =>
+                            handleTaskStatusChange(
+                              b,
+                              'platform_invoice',
+                              'platform_invoice_date',
+                              value
+                            )
+                          }
+                        />
                       </td>
                       <td className="text-center">
                         <StatusSquare
@@ -664,7 +648,7 @@ export default function TodoPage() {
                         <button
                           type="button"
                           onClick={() => handleInvExpToggle(b)}
-                          title={`Inv & Exp ${b.inv_exp_done ? 'done' : 'pending'} — click to change`}
+                          title={`Exp ${b.inv_exp_done ? 'done' : 'pending'} — click to change`}
                           className="inline-flex items-center justify-center"
                         >
                           <span
