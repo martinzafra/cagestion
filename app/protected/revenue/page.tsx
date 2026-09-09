@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, Pencil, FileSpreadsheet, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, Pencil, FileSpreadsheet, ChevronUp, ChevronDown, Paperclip, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDate, formatCurrency } from '@/lib/calculations';
 import { getApartmentColorMap } from '@/lib/apartmentColors';
@@ -58,6 +58,8 @@ export default function RevenuePage() {
     search: '',
   });
   const [apartmentFilterIds, setApartmentFilterIds] = useState<Set<string>>(new Set());
+  const formFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [pendingAttachmentFile, setPendingAttachmentFile] = useState<File | null>(null);
 
   const [formData, setFormData] = useState(blankFormData);
 
@@ -129,6 +131,8 @@ export default function RevenuePage() {
         attachment_url: formData.attachment_url || null,
       };
 
+      let revenueId = editingRevenueId;
+
       if (editingRevenueId) {
         const { error } = await supabase
           .from('revenue_invoicing')
@@ -137,13 +141,34 @@ export default function RevenuePage() {
         if (error) throw error;
         toast.success('Revenue entry updated');
       } else {
-        const { error } = await supabase.from('revenue_invoicing').insert([payload]);
+        const { data, error } = await supabase
+          .from('revenue_invoicing')
+          .insert([payload])
+          .select()
+          .single();
         if (error) throw error;
+        revenueId = data.id;
         toast.success('Revenue entry created');
+      }
+
+      if (pendingAttachmentFile && revenueId) {
+        const ext = pendingAttachmentFile.name.split('.').pop();
+        const path = `${revenueId}/${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from('revenue-attachments')
+          .upload(path, pendingAttachmentFile, { upsert: true });
+        if (uploadError) throw uploadError;
+
+        const { error: attachError } = await supabase
+          .from('revenue_invoicing')
+          .update({ attachment_url: path })
+          .eq('id', revenueId);
+        if (attachError) throw attachError;
       }
 
       setShowForm(false);
       setEditingRevenueId(undefined);
+      setPendingAttachmentFile(null);
       fetchData();
       setFormData(blankFormData);
     } catch (error: any) {
@@ -169,6 +194,7 @@ export default function RevenuePage() {
       issued: rev.issued,
       attachment_url: rev.attachment_url || '',
     });
+    setPendingAttachmentFile(null);
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -187,6 +213,36 @@ export default function RevenuePage() {
       fetchData();
     } catch (error: any) {
       toast.error(error.message);
+    }
+  };
+
+  const handleViewAttachment = async (path: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('revenue-attachments')
+        .createSignedUrl(path, 60);
+      if (error) throw error;
+      if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to open attachment');
+    }
+  };
+
+  const handleRemoveFormAttachment = async () => {
+    if (!editingRevenueId || !formData.attachment_url) return;
+    if (!confirm('Remove this attachment?')) return;
+    try {
+      await supabase.storage.from('revenue-attachments').remove([formData.attachment_url]);
+      const { error } = await supabase
+        .from('revenue_invoicing')
+        .update({ attachment_url: null })
+        .eq('id', editingRevenueId);
+      if (error) throw error;
+
+      setFormData((prev) => ({ ...prev, attachment_url: '' }));
+      toast.success('Attachment removed');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to remove attachment');
     }
   };
 
@@ -333,6 +389,7 @@ export default function RevenuePage() {
             onClick={() => {
               setEditingRevenueId(undefined);
               setFormData(blankFormData);
+              setPendingAttachmentFile(null);
               setShowForm((prev) => !prev);
             }}
             className="btn-primary flex items-center gap-2"
@@ -538,6 +595,64 @@ export default function RevenuePage() {
               </Switch>
             </div>
 
+            {formData.revenue_type === 'INVOICE' && (
+              <div>
+                <label className="label">Invoice Attachment</label>
+                <input
+                  type="file"
+                  accept="application/pdf,image/*"
+                  ref={formFileInputRef}
+                  className="hidden"
+                  onChange={(e) => setPendingAttachmentFile(e.target.files?.[0] || null)}
+                />
+                {pendingAttachmentFile ? (
+                  <div className="flex items-center gap-2 text-sm text-gray-700">
+                    <Paperclip size={16} className="text-gray-600" />
+                    <span>{pendingAttachmentFile.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPendingAttachmentFile(null);
+                        if (formFileInputRef.current) formFileInputRef.current.value = '';
+                      }}
+                      title="Discard selected file"
+                      className="p-1 hover:bg-red-100 rounded"
+                    >
+                      <X size={14} className="text-red-500" />
+                    </button>
+                  </div>
+                ) : formData.attachment_url ? (
+                  <div className="flex items-center gap-2 text-sm text-gray-700">
+                    <button
+                      type="button"
+                      onClick={() => handleViewAttachment(formData.attachment_url)}
+                      className="flex items-center gap-1 hover:underline"
+                    >
+                      <Paperclip size={16} className="text-gray-600" />
+                      View attachment
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRemoveFormAttachment}
+                      title="Remove attachment"
+                      className="p-1 hover:bg-red-100 rounded"
+                    >
+                      <X size={14} className="text-red-500" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => formFileInputRef.current?.click()}
+                    className="btn-secondary flex items-center gap-2 w-fit"
+                  >
+                    <Plus size={16} />
+                    Attach File
+                  </button>
+                )}
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button
                 type="submit"
@@ -550,6 +665,7 @@ export default function RevenuePage() {
                 onClick={() => {
                   setShowForm(false);
                   setEditingRevenueId(undefined);
+                  setPendingAttachmentFile(null);
                 }}
                 className="btn-secondary"
               >
@@ -694,6 +810,18 @@ export default function RevenuePage() {
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <div className="flex gap-1">
+                        <span className="w-6 flex justify-center">
+                          {rev.attachment_url && (
+                            <button
+                              type="button"
+                              onClick={() => handleViewAttachment(rev.attachment_url)}
+                              title="View attachment"
+                              className="p-1 hover:bg-gray-100 rounded"
+                            >
+                              <Paperclip size={16} className="text-gray-600" />
+                            </button>
+                          )}
+                        </span>
                         <button
                           onClick={() => handleEditRevenue(rev.id)}
                           className="p-1 hover:bg-blue-100 rounded"
