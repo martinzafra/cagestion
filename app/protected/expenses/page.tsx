@@ -388,6 +388,15 @@ export default function ExpensesPage() {
       })
     : filteredExpenses;
 
+  const expenseTotals = sortedExpenses.reduce(
+    (acc, exp) => ({
+      amount: acc.amount + (exp.amount || 0),
+      vat: acc.vat + (exp.vat || 0),
+      total: acc.total + (exp.total || 0),
+    }),
+    { amount: 0, vat: 0, total: 0 }
+  );
+
   const SortableHeader: React.FC<{
     column: SortColumn;
     children: React.ReactNode;
@@ -827,6 +836,18 @@ export default function ExpensesPage() {
                 ))
               )}
             </tbody>
+            {sortedExpenses.length > 0 && (
+              <tfoot>
+                <tr className="font-semibold border-t-2">
+                  <td colSpan={5} className="text-right">Total</td>
+                  <td className="text-right">{formatCurrency(expenseTotals.amount)}</td>
+                  <td className="text-right">{formatCurrency(expenseTotals.vat)}</td>
+                  <td className="text-right">{formatCurrency(expenseTotals.total)}</td>
+                  <td></td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            )}
           </table>
           </div>
         </>
