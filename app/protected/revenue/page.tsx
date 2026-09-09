@@ -483,7 +483,8 @@ export default function RevenuePage() {
                     .filter(
                       (b) =>
                         (!formData.apartment_id || b.apartment_id === formData.apartment_id) &&
-                        (b.status !== 'CANCELLED' || b.id === formData.booking_id)
+                        ((b.status !== 'FINISHED' && b.status !== 'CANCELLED') ||
+                          b.id === formData.booking_id)
                     )
                     .map((b) => (
                       <option key={b.id} value={b.id}>

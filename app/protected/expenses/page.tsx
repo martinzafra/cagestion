@@ -65,6 +65,12 @@ export default function ExpensesPage() {
   useEffect(() => {
     fetchData();
     fetchCurrentUserRole().then(setUserRole);
+    // Booking phases change on the To Do screen; if this tab was left open
+    // (or served from Next's client-side route cache on back-navigation),
+    // catch up on refocus so the Booking allocation picker isn't stale.
+    const handleFocus = () => fetchBookings();
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   const fetchData = async () => {
@@ -102,6 +108,23 @@ export default function ExpensesPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Bookings change status/phase on the To Do screen while this page may
+  // already be mounted (e.g. left open in another tab, or served from
+  // Next.js's client-side route cache on back-navigation), so the
+  // Booking allocation picker can go stale. Re-fetch fresh right before
+  // showing it, rather than relying only on the page's initial load.
+  const fetchBookings = async () => {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('id, guest_name, booking_ref, check_in_date, check_out_date, status, apartment_id')
+      .order('check_in_date', { ascending: false });
+    if (error) {
+      toast.error('Failed to refresh bookings');
+      return;
+    }
+    setBookings(data || []);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -192,6 +215,7 @@ export default function ExpensesPage() {
     const exp = expenses.find((e) => e.id === id);
     if (!exp) return;
 
+    fetchBookings();
     setEditingExpenseId(id);
     setFormData({
       expense_type: exp.expense_type,
@@ -393,6 +417,7 @@ export default function ExpensesPage() {
           )}
           <button
             onClick={() => {
+              fetchBookings();
               setEditingExpenseId(undefined);
               setFormData(blankFormData);
               setPendingAttachmentFile(null);
@@ -561,7 +586,8 @@ export default function ExpensesPage() {
                     .filter(
                       (b) =>
                         (!formData.apartment_id || b.apartment_id === formData.apartment_id) &&
-                        (b.status !== 'CANCELLED' || b.id === formData.booking_id)
+                        ((b.status !== 'FINISHED' && b.status !== 'CANCELLED') ||
+                          b.id === formData.booking_id)
                     )
                     .map((b) => (
                       <option key={b.id} value={b.id}>
