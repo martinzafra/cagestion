@@ -105,6 +105,9 @@ export default function TodoPage() {
   const [userRole, setUserRole] = useState('');
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [apartments, setApartments] = useState<any[]>([]);
+  // Booking IDs with at least one Revenue entry - CA Inv and Liquidation
+  // can't be marked Sent without one to invoice against.
+  const [revenueBookingIds, setRevenueBookingIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [showCompleted, setShowCompleted] = useState(false);
   // Snapshot of which rows were pending at the last fetch, frozen so a row
@@ -128,8 +131,24 @@ export default function TodoPage() {
   useEffect(() => {
     fetchBookings();
     fetchApartments();
+    fetchRevenueBookingIds();
     fetchCurrentUserRole().then(setUserRole);
+    // Revenue is assigned from a different screen - catch up on refocus so
+    // the Sent restriction isn't left stale.
+    const handleFocus = () => fetchRevenueBookingIds();
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
+
+  const fetchRevenueBookingIds = async () => {
+    try {
+      const { data, error } = await supabase.from('revenue_invoicing').select('booking_id');
+      if (error) throw error;
+      setRevenueBookingIds(new Set((data || []).map((r: any) => r.booking_id)));
+    } catch (error) {
+      toast.error('Failed to check Revenue records');
+    }
+  };
 
   const fetchBookings = async () => {
     try {
@@ -294,6 +313,10 @@ export default function TodoPage() {
     dateField: 'platform_invoice_date' | 'final_liquidation_date' | null,
     value: string
   ) => {
+    if (field === 'final_liquidation' && value === 'SENT' && !revenueBookingIds.has(booking.id)) {
+      toast.error('Assign Revenue to this booking before marking CA Inv and Liquidation as Sent');
+      return;
+    }
     const updates: Record<string, any> = { [field]: value };
     const isCompleteValue = value === 'DONE' || value === 'SENT';
     if (dateField) {
@@ -630,7 +653,14 @@ export default function TodoPage() {
                           }
                         />
                       </td>
-                      <td className="text-center">
+                      <td
+                        className="text-center"
+                        title={
+                          !revenueBookingIds.has(b.id)
+                            ? 'No Revenue assigned to this booking yet'
+                            : undefined
+                        }
+                      >
                         <StatusSquare
                           value={b.final_liquidation}
                           doneValue="SENT"
