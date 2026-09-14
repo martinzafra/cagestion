@@ -392,9 +392,20 @@ export default function ExpensesPage() {
       })
     : filteredExpenses;
 
-  const vendorOptions = Array.from(new Set(expenses.map((exp) => exp.vendor).filter(Boolean))).sort(
-    (a, b) => a.localeCompare(b)
-  );
+  // Vendors are scoped to the Type + Category combo, so switching either
+  // resets the list to only names actually used for that pairing before.
+  const vendorOptions = Array.from(
+    new Set(
+      expenses
+        .filter(
+          (exp) =>
+            exp.expense_type === formData.expense_type &&
+            exp.expense_category_id === formData.expense_category_id
+        )
+        .map((exp) => exp.vendor)
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
 
   const expenseTotals = sortedExpenses.reduce(
     (acc, exp) => ({
@@ -466,12 +477,14 @@ export default function ExpensesPage() {
                 <label className="label">Type *</label>
                 <select
                   value={formData.expense_type}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    setIsNewVendor(false);
                     setFormData({
                       ...formData,
                       expense_type: e.target.value as 'INVOICE' | 'PAYMENT' | 'OWNERS EXPENSE',
-                    })
-                  }
+                      vendor: '',
+                    });
+                  }}
                   className="select"
                 >
                   <option value="INVOICE">Invoice</option>
@@ -483,12 +496,14 @@ export default function ExpensesPage() {
                 <label className="label">Category *</label>
                 <select
                   value={formData.expense_category_id}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    setIsNewVendor(false);
                     setFormData({
                       ...formData,
                       expense_category_id: e.target.value,
-                    })
-                  }
+                      vendor: '',
+                    });
+                  }}
                   className="select"
                   required
                 >
@@ -543,7 +558,9 @@ export default function ExpensesPage() {
                     className="select"
                     required
                   >
-                    <option value="">Select Vendor</option>
+                    <option value="">
+                      {formData.expense_category_id ? 'Select Vendor' : 'Select Category first'}
+                    </option>
                     {vendorOptions.map((v) => (
                       <option key={v} value={v}>
                         {v}
