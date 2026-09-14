@@ -55,6 +55,8 @@ export default function ExpensesPage() {
   const [apartmentFilterIds, setApartmentFilterIds] = useState<Set<string>>(new Set());
   const formFileInputRef = useRef<HTMLInputElement | null>(null);
   const [pendingAttachmentFile, setPendingAttachmentFile] = useState<File | null>(null);
+  // Vendor field toggles between picking an existing name and typing a new one.
+  const [isNewVendor, setIsNewVendor] = useState(false);
 
   const [listFilters, setListFilters] = useState({
     expense_type: '',
@@ -210,6 +212,7 @@ export default function ExpensesPage() {
       setShowForm(false);
       setEditingExpenseId(undefined);
       setPendingAttachmentFile(null);
+      setIsNewVendor(false);
       fetchData();
       setFormData(blankFormData);
     } catch (error: any) {
@@ -237,6 +240,7 @@ export default function ExpensesPage() {
       attachment_url: exp.attachment_url || '',
     });
     setPendingAttachmentFile(null);
+    setIsNewVendor(false);
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -388,6 +392,10 @@ export default function ExpensesPage() {
       })
     : filteredExpenses;
 
+  const vendorOptions = Array.from(new Set(expenses.map((exp) => exp.vendor).filter(Boolean))).sort(
+    (a, b) => a.localeCompare(b)
+  );
+
   const expenseTotals = sortedExpenses.reduce(
     (acc, exp) => ({
       amount: acc.amount + (exp.amount || 0),
@@ -436,6 +444,7 @@ export default function ExpensesPage() {
               setEditingExpenseId(undefined);
               setFormData(blankFormData);
               setPendingAttachmentFile(null);
+              setIsNewVendor(false);
               setShowForm((prev) => !prev);
             }}
             className="btn-primary flex items-center gap-2"
@@ -496,15 +505,53 @@ export default function ExpensesPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="label">Vendor *</label>
-                <input
-                  type="text"
-                  value={formData.vendor}
-                  onChange={(e) =>
-                    setFormData({ ...formData, vendor: e.target.value })
-                  }
-                  className="input"
-                  required
-                />
+                {isNewVendor ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={formData.vendor}
+                      onChange={(e) =>
+                        setFormData({ ...formData, vendor: e.target.value })
+                      }
+                      className="input"
+                      placeholder="New vendor name"
+                      autoFocus
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsNewVendor(false);
+                        setFormData({ ...formData, vendor: '' });
+                      }}
+                      className="text-sm text-blue-600 hover:underline whitespace-nowrap"
+                    >
+                      Choose existing
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={formData.vendor}
+                    onChange={(e) => {
+                      if (e.target.value === '__new__') {
+                        setIsNewVendor(true);
+                        setFormData({ ...formData, vendor: '' });
+                      } else {
+                        setFormData({ ...formData, vendor: e.target.value });
+                      }
+                    }}
+                    className="select"
+                    required
+                  >
+                    <option value="">Select Vendor</option>
+                    {vendorOptions.map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                    <option value="__new__">+ Add new vendor...</option>
+                  </select>
+                )}
               </div>
               <div>
                 <label className="label">Date *</label>
