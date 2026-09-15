@@ -87,7 +87,7 @@ export default function RevenuePage() {
         fetchAllowedApartments(),
         supabase
           .from('bookings')
-          .select('id, guest_name, check_in_date, booking_ref, apartment_id, status')
+          .select('id, guest_name, check_in_date, booking_ref, apartment_id, status, guest_total_amount')
           .order('check_in_date', { ascending: false }),
         supabase.from('inventory_invoice_items').select('*').order('name'),
       ]);
@@ -350,6 +350,18 @@ export default function RevenuePage() {
     Math.round(formData.total_services * (formData.commission_percentage / 100) * 100) / 100;
   const totalAmount = Math.round((commissionAmount + (formData.vat || 0)) * 100) / 100;
 
+  // Suggested IVA (21%, Spain's general rate) on the subtotal - only
+  // proposed for Invoice entries, a Collection has no VAT to declare.
+  const proposeVat = (
+    total_services: number,
+    commission_percentage: number,
+    revenue_type: 'INVOICE' | 'COLLECTION'
+  ) => {
+    if (revenue_type !== 'INVOICE') return 0;
+    const subtotal = Math.round(total_services * (commission_percentage / 100) * 100) / 100;
+    return Math.round(subtotal * 0.21 * 100) / 100;
+  };
+
   const SortableHeader: React.FC<{
     column: SortColumn;
     children: React.ReactNode;
@@ -411,12 +423,14 @@ export default function RevenuePage() {
                 <label className="label">Revenue Type *</label>
                 <select
                   value={formData.revenue_type}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      revenue_type: e.target.value as 'INVOICE' | 'COLLECTION',
-                    })
-                  }
+                  onChange={(e) => {
+                    const revenue_type = e.target.value as 'INVOICE' | 'COLLECTION';
+                    setFormData((prev) => ({
+                      ...prev,
+                      revenue_type,
+                      vat: proposeVat(prev.total_services, prev.commission_percentage, revenue_type),
+                    }));
+                  }}
                   className="select"
                 >
                   <option value="INVOICE">Invoice</option>
@@ -454,9 +468,19 @@ export default function RevenuePage() {
                 <label className="label">Apartment *</label>
                 <select
                   value={formData.apartment_id}
-                  onChange={(e) =>
-                    setFormData({ ...formData, apartment_id: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const apt = apartments.find((a) => a.id === e.target.value);
+                    setFormData((prev) => {
+                      const commission_percentage =
+                        apt?.commission_percentage ?? prev.commission_percentage;
+                      return {
+                        ...prev,
+                        apartment_id: e.target.value,
+                        commission_percentage,
+                        vat: proposeVat(prev.total_services, commission_percentage, prev.revenue_type),
+                      };
+                    });
+                  }}
                   className="select"
                   required
                 >
@@ -472,9 +496,28 @@ export default function RevenuePage() {
                 <label className="label">Booking *</label>
                 <select
                   value={formData.booking_id}
-                  onChange={(e) =>
-                    setFormData({ ...formData, booking_id: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const booking = bookings.find((b) => b.id === e.target.value);
+                    const apt = booking
+                      ? apartments.find((a) => a.id === booking.apartment_id)
+                      : undefined;
+                    setFormData((prev) => {
+                      const apartment_id = booking ? booking.apartment_id : prev.apartment_id;
+                      const commission_percentage =
+                        apt?.commission_percentage ?? prev.commission_percentage;
+                      const total_services = booking
+                        ? booking.guest_total_amount ?? 0
+                        : prev.total_services;
+                      return {
+                        ...prev,
+                        booking_id: e.target.value,
+                        apartment_id,
+                        commission_percentage,
+                        total_services,
+                        vat: proposeVat(total_services, commission_percentage, prev.revenue_type),
+                      };
+                    });
+                  }}
                   className="select"
                   required
                 >
