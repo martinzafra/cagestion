@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { calculateNights } from '@/lib/calculations';
+import { calculateNights, round2 } from '@/lib/calculations';
 import toast from 'react-hot-toast';
 import Switch from './Switch';
 
@@ -106,19 +106,19 @@ const BookingForm: React.FC<BookingFormProps> = ({
       setNights(calculatedNights);
 
       if (formData.owners_booking) {
-        const total = formData.cleaning_charge + formData.other_charge;
+        const total = round2(formData.cleaning_charge + formData.other_charge);
         setFormData((prev) => ({ ...prev, daily_price: 0, total_rent: 0, guest_total_amount: total }));
       } else if (priceMode === 'daily') {
-        const rent = formData.daily_price * calculatedNights;
-        const total = rent + formData.cleaning_charge + formData.other_charge;
+        const rent = round2(formData.daily_price * calculatedNights);
+        const total = round2(rent + formData.cleaning_charge + formData.other_charge);
         setFormData((prev) => ({ ...prev, total_rent: rent, guest_total_amount: total }));
       } else {
         const rent = formData.total_rent || 0;
         const perNight = calculatedNights > 0 ? rent / calculatedNights : 0;
-        const total = rent + formData.cleaning_charge + formData.other_charge;
+        const total = round2(rent + formData.cleaning_charge + formData.other_charge);
         setFormData((prev) => ({
           ...prev,
-          daily_price: Math.round(perNight * 100) / 100,
+          daily_price: round2(perNight),
           guest_total_amount: total,
         }));
       }

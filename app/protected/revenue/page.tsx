@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, Trash2, Pencil, FileSpreadsheet, ChevronUp, ChevronDown, Paperclip, X } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { formatDate, formatCurrency } from '@/lib/calculations';
+import { formatDate, formatCurrency, round2 } from '@/lib/calculations';
 import { getApartmentColorMap } from '@/lib/apartmentColors';
 import { fetchAllowedApartments } from '@/lib/apartmentAccess';
 import { fetchCurrentUserRole } from '@/lib/userRole';
@@ -346,9 +346,8 @@ export default function RevenuePage() {
 
   // Mirrors revenue_invoicing's generated amount/amount_with_vat columns so
   // the form previews the total before it's saved.
-  const commissionAmount =
-    Math.round(formData.total_services * (formData.commission_percentage / 100) * 100) / 100;
-  const totalAmount = Math.round((commissionAmount + (formData.vat || 0)) * 100) / 100;
+  const commissionAmount = round2(formData.total_services * (formData.commission_percentage / 100));
+  const totalAmount = round2(commissionAmount + (formData.vat || 0));
 
   // Suggested IVA (21%, Spain's general rate) on the subtotal - only
   // proposed for Invoice entries, a Collection has no VAT to declare.
@@ -358,8 +357,8 @@ export default function RevenuePage() {
     revenue_type: 'INVOICE' | 'COLLECTION'
   ) => {
     if (revenue_type !== 'INVOICE') return 0;
-    const subtotal = Math.round(total_services * (commission_percentage / 100) * 100) / 100;
-    return Math.round(subtotal * 0.21 * 100) / 100;
+    const subtotal = round2(total_services * (commission_percentage / 100));
+    return round2(subtotal * 0.21);
   };
 
   const SortableHeader: React.FC<{
@@ -506,7 +505,7 @@ export default function RevenuePage() {
                       const commission_percentage =
                         apt?.commission_percentage ?? prev.commission_percentage;
                       const total_services = booking
-                        ? booking.guest_total_amount ?? 0
+                        ? round2(booking.guest_total_amount ?? 0)
                         : prev.total_services;
                       return {
                         ...prev,

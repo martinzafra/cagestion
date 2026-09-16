@@ -31,6 +31,12 @@ export function calculateGuestTotalAmount(
   return totalNights + cleaningCharge + otherCharge;
 }
 
+// Rounds to 2 decimals, guarding against the floating-point drift that
+// plain arithmetic on money values produces (e.g. 33.33 * 3 = 99.99000000000001).
+export function round2(amount: number): number {
+  return Math.round((amount + Number.EPSILON) * 100) / 100;
+}
+
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
