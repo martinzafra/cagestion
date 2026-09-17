@@ -11,6 +11,7 @@ import { fetchAllowedApartments } from '@/lib/apartmentAccess';
 import { fetchCurrentUserRole } from '@/lib/userRole';
 import { compareSortValues } from '@/lib/sort';
 import { exportToExcel } from '@/lib/exportExcel';
+import { getPlatformBadge } from '@/lib/platformBadge';
 
 type TaskStatus = 'TO BE DONE' | 'DONE' | 'NA';
 type InvoiceStatus = 'TO BE DONE' | 'SENT' | 'NA';
@@ -18,9 +19,11 @@ type InvoiceStatus = 'TO BE DONE' | 'SENT' | 'NA';
 type SortColumn =
   | 'apartment'
   | 'guest_name'
+  | 'platform'
   | 'check_in_date'
   | 'check_out_date'
   | 'todo_status'
+  | 'guest_instructions'
   | 'police_registration'
   | 'platform_invoice'
   | 'final_liquidation';
@@ -34,6 +37,8 @@ interface BookingRow {
   check_out_date: string;
   apartment_id: string;
   apartment: { name: string } | null;
+  platform: { name: string } | null;
+  guest_instructions: TaskStatus;
   police_registration: TaskStatus;
   police_registration_file: string | null;
   platform_invoice: InvoiceStatus;
@@ -80,6 +85,7 @@ function hexToRgba(hex: string, alpha: number): string {
 // also set.
 function isAdminTasksComplete(b: BookingRow): boolean {
   return (
+    (b.guest_instructions === 'DONE' || b.guest_instructions === 'NA') &&
     (b.police_registration === 'DONE' || b.police_registration === 'NA') &&
     (b.platform_invoice === 'SENT' || b.platform_invoice === 'NA') &&
     (b.final_liquidation === 'SENT' || b.final_liquidation === 'NA')
@@ -120,6 +126,7 @@ export default function TodoPage() {
     apartment_id: '',
     search: '',
     todo_status: '',
+    guest_instructions: '',
     police_registration: '',
     platform_invoice: '',
     final_liquidation: '',
@@ -158,6 +165,8 @@ export default function TodoPage() {
         .select(`
           id, booking_ref, guest_name, status, check_in_date, check_out_date,
           apartment_id, apartment:inventory_apartments(name),
+          platform:inventory_platforms(name),
+          guest_instructions,
           police_registration, police_registration_file,
           platform_invoice, platform_invoice_date,
           final_liquidation, final_liquidation_date,
@@ -202,6 +211,8 @@ export default function TodoPage() {
       if (!matches) return false;
     }
     if (filters.todo_status && computeTodoStatus(b) !== filters.todo_status) return false;
+    if (filters.guest_instructions && b.guest_instructions !== filters.guest_instructions)
+      return false;
     if (filters.police_registration && b.police_registration !== filters.police_registration)
       return false;
     if (filters.platform_invoice && b.platform_invoice !== filters.platform_invoice)
@@ -220,10 +231,12 @@ export default function TodoPage() {
       { header: 'Apartment', value: (b) => b.apartment?.name },
       { header: 'Guest Name', value: (b) => b.guest_name },
       { header: 'Booking Ref', value: (b) => b.booking_ref },
+      { header: 'Platform', value: (b) => b.platform?.name },
       { header: 'Booking Status', value: (b) => b.status },
       { header: 'To Do Status', value: (b) => PHASE_LABEL[computeTodoStatus(b)] || computeTodoStatus(b) },
       { header: 'Check-in Date', value: (b) => b.check_in_date },
       { header: 'Check-out Date', value: (b) => b.check_out_date },
+      { header: 'Guest Instructions', value: (b) => b.guest_instructions },
       { header: 'Police Registration', value: (b) => b.police_registration },
       { header: 'Police Registration Photo', value: (b) => (b.police_registration_file ? 'Yes' : 'No') },
       { header: 'Owner Invoice', value: (b) => b.platform_invoice },
@@ -250,12 +263,16 @@ export default function TodoPage() {
         return b.apartment?.name?.toLowerCase() || '';
       case 'guest_name':
         return b.guest_name?.toLowerCase() || '';
+      case 'platform':
+        return b.platform?.name?.toLowerCase() || '';
       case 'check_in_date':
         return b.check_in_date || '';
       case 'check_out_date':
         return b.check_out_date || '';
       case 'todo_status':
         return computeTodoStatus(b);
+      case 'guest_instructions':
+        return b.guest_instructions;
       case 'police_registration':
         return b.police_registration;
       case 'platform_invoice':
@@ -309,7 +326,7 @@ export default function TodoPage() {
 
   const handleTaskStatusChange = (
     booking: BookingRow,
-    field: 'police_registration' | 'platform_invoice' | 'final_liquidation',
+    field: 'guest_instructions' | 'police_registration' | 'platform_invoice' | 'final_liquidation',
     dateField: 'platform_invoice_date' | 'final_liquidation_date' | null,
     value: string
   ) => {
@@ -443,7 +460,7 @@ export default function TodoPage() {
 
       {/* Filter line */}
       <div className="card">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
           <select
             value={filters.apartment_id}
             onChange={(e) => setFilters({ ...filters, apartment_id: e.target.value })}
@@ -475,6 +492,18 @@ export default function TodoPage() {
             <option value="CHECK OUT">Checked Out</option>
             <option value="TO INV/EXP">Input Exp.</option>
             <option value="COMPLETED">Completed</option>
+          </select>
+          <select
+            value={filters.guest_instructions}
+            onChange={(e) =>
+              setFilters({ ...filters, guest_instructions: e.target.value })
+            }
+            className="select"
+          >
+            <option value="">Guest Instructions: All</option>
+            <option value="TO BE DONE">To Be Done</option>
+            <option value="DONE">Done</option>
+            <option value="NA">N/A</option>
           </select>
           <select
             value={filters.police_registration}
@@ -530,31 +559,35 @@ export default function TodoPage() {
             <colgroup>
               <col className="w-[90px]" />
               <col className="w-[220px]" />
+              <col className="w-[50px]" />
               <col className="w-[75px]" />
               <col className="w-[80px]" />
               <col className="w-[165px]" />
-              <col className="w-[150px]" />
-              <col className="w-[90px]" />
-              <col className="w-[150px]" />
-              <col className="w-[150px]" />
+              <col className="w-[70px]" />
+              <col className="w-[125px]" />
+              <col className="w-[125px]" />
+              <col className="w-[125px]" />
+              <col className="w-[125px]" />
             </colgroup>
             <thead>
               <tr>
                 <SortableHeader column="apartment">Apartment</SortableHeader>
                 <SortableHeader column="guest_name">Booking</SortableHeader>
+                <SortableHeader column="platform" align="center">Platform</SortableHeader>
                 <SortableHeader column="check_in_date">Check-in</SortableHeader>
                 <SortableHeader column="check_out_date">Check-out</SortableHeader>
                 <SortableHeader column="todo_status">To Do Status</SortableHeader>
+                <th className="!text-center">Exp</th>
+                <SortableHeader column="guest_instructions" align="center">Guest Instructions</SortableHeader>
                 <SortableHeader column="police_registration" align="center">Police Registration</SortableHeader>
                 <SortableHeader column="platform_invoice" align="center">Owner Invoice</SortableHeader>
                 <SortableHeader column="final_liquidation" align="center">CA Inv and Liquidation</SortableHeader>
-                <th className="!text-center">Exp</th>
               </tr>
             </thead>
             <tbody>
               {sortedBookings.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-8 text-gray-500">
+                  <td colSpan={11} className="text-center py-8 text-gray-500">
                     {showCompleted
                       ? 'No bookings found'
                       : 'No pending tasks — everything is up to date'}
@@ -574,6 +607,21 @@ export default function TodoPage() {
                         <div>{b.guest_name}</div>
                         <div className="text-gray-400">{b.booking_ref}</div>
                       </td>
+                      <td className="text-center">
+                        {(() => {
+                          const badge = getPlatformBadge(b.platform?.name);
+                          return (
+                            <span
+                              title={b.platform?.name || 'No platform'}
+                              className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${
+                                badge.textClassName || 'text-white'
+                              } ${badge.className}`}
+                            >
+                              {badge.text}
+                            </span>
+                          );
+                        })()}
+                      </td>
                       <td className="whitespace-nowrap">{formatDate(b.check_in_date)}</td>
                       <td className="whitespace-nowrap">{formatDate(b.check_out_date)}</td>
                       <td>
@@ -587,6 +635,35 @@ export default function TodoPage() {
                         >
                           {PHASE_LABEL[todoStatus] || todoStatus}
                         </span>
+                      </td>
+                      <td className="text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleInvExpToggle(b)}
+                          title={`Exp ${b.inv_exp_done ? 'done' : 'pending'} — click to change`}
+                          className="inline-flex items-center justify-center"
+                        >
+                          <span
+                            className={`w-6 h-6 rounded border-2 flex items-center justify-center transition ${
+                              b.inv_exp_done
+                                ? 'bg-green-500 border-green-500'
+                                : 'bg-white border-gray-300 hover:border-gray-400'
+                            }`}
+                          >
+                            {b.inv_exp_done && (
+                              <Check size={16} className="text-white" strokeWidth={3} />
+                            )}
+                          </span>
+                        </button>
+                      </td>
+                      <td className="text-center">
+                        <StatusSquare
+                          value={b.guest_instructions}
+                          doneValue="DONE"
+                          onChange={(value) =>
+                            handleTaskStatusChange(b, 'guest_instructions', null, value)
+                          }
+                        />
                       </td>
                       <td>
                         <div className="flex gap-1.5 items-center justify-center">
@@ -673,26 +750,6 @@ export default function TodoPage() {
                             )
                           }
                         />
-                      </td>
-                      <td className="text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleInvExpToggle(b)}
-                          title={`Exp ${b.inv_exp_done ? 'done' : 'pending'} — click to change`}
-                          className="inline-flex items-center justify-center"
-                        >
-                          <span
-                            className={`w-6 h-6 rounded border-2 flex items-center justify-center transition ${
-                              b.inv_exp_done
-                                ? 'bg-green-500 border-green-500'
-                                : 'bg-white border-gray-300 hover:border-gray-400'
-                            }`}
-                          >
-                            {b.inv_exp_done && (
-                              <Check size={16} className="text-white" strokeWidth={3} />
-                            )}
-                          </span>
-                        </button>
                       </td>
                     </tr>
                   );

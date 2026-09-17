@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   other_charge DECIMAL(10, 2) DEFAULT 0,
   guest_total_amount DECIMAL(10, 2),
 
+  guest_instructions task_status DEFAULT 'TO BE DONE',
   police_registration task_status DEFAULT 'TO BE DONE',
   police_registration_date DATE,
   police_registration_file TEXT,
