@@ -12,6 +12,59 @@ interface BookingFormProps {
   onCancel: () => void;
 }
 
+// Native <input type="number"> can't render thousands separators, so money
+// fields use this text input instead: formatted ("1,234.56") while not
+// focused, raw digits while typing so the formatter doesn't fight the cursor.
+interface FormattedNumberInputProps {
+  name: string;
+  value: number | null;
+  onValueChange: (value: number) => void;
+  disabled?: boolean;
+  required?: boolean;
+  className?: string;
+}
+
+const FormattedNumberInput: React.FC<FormattedNumberInputProps> = ({
+  name,
+  value,
+  onValueChange,
+  disabled,
+  required,
+  className,
+}) => {
+  const [focused, setFocused] = useState(false);
+  const [rawText, setRawText] = useState('');
+
+  const formatted =
+    value === null || value === undefined
+      ? ''
+      : value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      name={name}
+      value={focused ? rawText : formatted}
+      onChange={(e) => {
+        const next = e.target.value;
+        setRawText(next);
+        const parsed = parseFloat(next.replace(/,/g, ''));
+        onValueChange(Number.isNaN(parsed) ? 0 : parsed);
+      }}
+      onFocus={(e) => {
+        setRawText(value === null || value === undefined ? '' : String(value));
+        setFocused(true);
+        e.target.select();
+      }}
+      onBlur={() => setFocused(false)}
+      disabled={disabled}
+      required={required}
+      className={className}
+    />
+  );
+};
+
 interface FormData {
   booking_date: string;
   booking_ref: string;
@@ -655,15 +708,11 @@ const BookingForm: React.FC<BookingFormProps> = ({
           <label className="label">
             Daily Price {formData.owners_booking ? '(N/A)' : priceMode === 'daily' ? '*' : '(calculated)'}
           </label>
-          <input
-            type="number"
-            inputMode="decimal"
+          <FormattedNumberInput
             name="daily_price"
             value={formData.daily_price}
-            onChange={handleChange}
-            onFocus={(e) => e.target.select()}
+            onValueChange={(v) => setFormData((prev) => ({ ...prev, daily_price: v }))}
             className={`input ${formData.owners_booking || priceMode === 'total' ? 'bg-gray-100' : ''}`}
-            step="0.01"
             required={!formData.owners_booking && priceMode === 'daily'}
             disabled={formData.owners_booking || priceMode === 'total'}
           />
@@ -672,30 +721,22 @@ const BookingForm: React.FC<BookingFormProps> = ({
           <label className="label">
             Total Rent {formData.owners_booking ? '(N/A)' : priceMode === 'total' ? '*' : '(calculated)'}
           </label>
-          <input
-            type="number"
-            inputMode="decimal"
+          <FormattedNumberInput
             name="total_rent"
-            value={formData.total_rent ?? ''}
-            onChange={handleChange}
-            onFocus={(e) => e.target.select()}
+            value={formData.total_rent}
+            onValueChange={(v) => setFormData((prev) => ({ ...prev, total_rent: v }))}
             className={`input ${formData.owners_booking || priceMode === 'daily' ? 'bg-gray-100' : ''}`}
-            step="0.01"
             required={!formData.owners_booking && priceMode === 'total'}
             disabled={formData.owners_booking || priceMode === 'daily'}
           />
         </div>
         <div>
           <label className="label">Cleaning Charge</label>
-          <input
-            type="number"
-            inputMode="decimal"
+          <FormattedNumberInput
             name="cleaning_charge"
             value={formData.cleaning_charge}
-            onChange={handleChange}
-            onFocus={(e) => e.target.select()}
+            onValueChange={(v) => setFormData((prev) => ({ ...prev, cleaning_charge: v }))}
             className="input"
-            step="0.01"
           />
         </div>
       </div>
@@ -704,26 +745,21 @@ const BookingForm: React.FC<BookingFormProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="label">Other Charge</label>
-          <input
-            type="number"
-            inputMode="decimal"
+          <FormattedNumberInput
             name="other_charge"
             value={formData.other_charge}
-            onChange={handleChange}
-            onFocus={(e) => e.target.select()}
+            onValueChange={(v) => setFormData((prev) => ({ ...prev, other_charge: v }))}
             className="input"
-            step="0.01"
           />
         </div>
         <div>
           <label className="label">Guest Total Amount (calculated)</label>
-          <input
-            type="number"
+          <FormattedNumberInput
             name="guest_total_amount"
-            value={formData.guest_total_amount ?? ''}
+            value={formData.guest_total_amount}
+            onValueChange={() => {}}
             disabled
             className="input font-bold text-lg bg-gray-100"
-            step="0.01"
           />
         </div>
         <div>
