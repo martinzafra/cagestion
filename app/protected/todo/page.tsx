@@ -564,10 +564,10 @@ export default function TodoPage() {
               <col className="w-[80px]" />
               <col className="w-[165px]" />
               <col className="w-[70px]" />
-              <col className="w-[125px]" />
-              <col className="w-[125px]" />
-              <col className="w-[125px]" />
-              <col className="w-[125px]" />
+              <col className="w-[70px]" />
+              <col className="w-[70px]" />
+              <col className="w-[70px]" />
+              <col className="w-[70px]" />
             </colgroup>
             <thead>
               <tr>
@@ -577,11 +577,11 @@ export default function TodoPage() {
                 <SortableHeader column="check_in_date">Check-in</SortableHeader>
                 <SortableHeader column="check_out_date">Check-out</SortableHeader>
                 <SortableHeader column="todo_status">To Do Status</SortableHeader>
-                <th className="!text-center">Exp</th>
                 <SortableHeader column="guest_instructions" align="center">Guest Instructions</SortableHeader>
                 <SortableHeader column="police_registration" align="center">Police Registration</SortableHeader>
                 <SortableHeader column="platform_invoice" align="center">Owner Invoice</SortableHeader>
                 <SortableHeader column="final_liquidation" align="center">CA Inv and Liquidation</SortableHeader>
+                <th className="!text-center">Expenses</th>
               </tr>
             </thead>
             <tbody>
@@ -637,26 +637,6 @@ export default function TodoPage() {
                         </span>
                       </td>
                       <td className="text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleInvExpToggle(b)}
-                          title={`Exp ${b.inv_exp_done ? 'done' : 'pending'} — click to change`}
-                          className="inline-flex items-center justify-center"
-                        >
-                          <span
-                            className={`w-6 h-6 rounded border-2 flex items-center justify-center transition ${
-                              b.inv_exp_done
-                                ? 'bg-green-500 border-green-500'
-                                : 'bg-white border-gray-300 hover:border-gray-400'
-                            }`}
-                          >
-                            {b.inv_exp_done && (
-                              <Check size={16} className="text-white" strokeWidth={3} />
-                            )}
-                          </span>
-                        </button>
-                      </td>
-                      <td className="text-center">
                         <StatusSquare
                           value={b.guest_instructions}
                           doneValue="DONE"
@@ -666,7 +646,7 @@ export default function TodoPage() {
                         />
                       </td>
                       <td>
-                        <div className="flex gap-1.5 items-center justify-center">
+                        <div className="flex flex-wrap gap-1.5 items-center justify-center">
                           <StatusSquare
                             value={b.police_registration}
                             doneValue="DONE"
@@ -750,6 +730,26 @@ export default function TodoPage() {
                             )
                           }
                         />
+                      </td>
+                      <td className="text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleInvExpToggle(b)}
+                          title={`Expenses ${b.inv_exp_done ? 'done' : 'pending'} — click to change`}
+                          className="inline-flex items-center justify-center"
+                        >
+                          <span
+                            className={`w-6 h-6 rounded border-2 flex items-center justify-center transition ${
+                              b.inv_exp_done
+                                ? 'bg-green-500 border-green-500'
+                                : 'bg-white border-gray-300 hover:border-gray-400'
+                            }`}
+                          >
+                            {b.inv_exp_done && (
+                              <Check size={16} className="text-white" strokeWidth={3} />
+                            )}
+                          </span>
+                        </button>
                       </td>
                     </tr>
                   );
