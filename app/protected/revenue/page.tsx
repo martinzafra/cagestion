@@ -783,7 +783,8 @@ export default function RevenuePage() {
             </div>
           </div>
 
-          <div className="card overflow-x-auto">
+          <div className="card">
+          <div className="hidden md:block overflow-x-auto">
           <table className="table [table-layout:fixed] w-full text-xs [&_th]:text-xs [&_th]:px-2 [&_th]:py-1.5 [&_td]:text-xs [&_td]:px-2 [&_td]:py-1.5">
             <colgroup>
               <col className="w-[95px]" />
@@ -884,6 +885,97 @@ export default function RevenuePage() {
               )}
             </tbody>
           </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {sortedRevenues.length === 0 ? (
+              <p className="text-center py-8 text-gray-500">No revenue entries</p>
+            ) : (
+              sortedRevenues.map((rev) => (
+                <div key={rev.id} className="border border-gray-200 rounded-2xl p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-medium">{rev.revenue_type}</div>
+                      <div className="text-gray-400 text-xs font-mono">
+                        {rev.invoice_number || '—'}
+                      </div>
+                    </div>
+                    <span
+                      className={`shrink-0 px-2 py-1 rounded text-xs font-medium uppercase ${
+                        rev.issued
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}
+                    >
+                      {rev.issued ? 'Issued' : 'Draft'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm mt-3 pt-3 border-t border-gray-100">
+                    <div>
+                      <div className="text-xs text-gray-500">Date</div>
+                      <div className="font-medium">{formatDate(rev.revenue_date)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Apartment</div>
+                      <div className="font-medium">{rev.apartment?.name}</div>
+                    </div>
+                    <div className="col-span-full">
+                      <div className="text-xs text-gray-500">Guest/Booking Ref</div>
+                      <div className="font-medium">{rev.booking?.guest_name}</div>
+                      <div className="text-gray-400 text-xs">{rev.booking?.booking_ref}</div>
+                    </div>
+                    <div className="col-span-full">
+                      <div className="text-xs text-gray-500">Item</div>
+                      <div className="font-medium">{rev.item?.name}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Services €</div>
+                      <div className="font-medium">{formatCurrency(rev.total_services)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">%</div>
+                      <div className="font-medium">{rev.commission_percentage}%</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Amount €</div>
+                      <div className="font-semibold">{formatCurrency(rev.amount)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Amount w/ VAT €</div>
+                      <div className="font-medium">{formatCurrency(rev.amount_with_vat)}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-1 mt-3 pt-3 border-t border-gray-100">
+                    {rev.attachment_url && (
+                      <button
+                        type="button"
+                        onClick={() => handleViewAttachment(rev.attachment_url)}
+                        title="View attachment"
+                        className="p-1.5 hover:bg-gray-100 rounded"
+                      >
+                        <Paperclip size={18} className="text-gray-600" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleEditRevenue(rev.id)}
+                      className="p-1.5 hover:bg-blue-100 rounded"
+                    >
+                      <Pencil size={18} className="text-blue-600" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(rev.id)}
+                      className="p-1.5 hover:bg-red-100 rounded"
+                    >
+                      <Trash2 size={18} className="text-red-600" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
           </div>
         </>
       )}

@@ -554,7 +554,8 @@ export default function TodoPage() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
       ) : (
-        <div className="card overflow-x-auto">
+        <div className="card">
+        <div className="hidden md:block overflow-x-auto">
           <table className="table [table-layout:fixed] w-full text-xs [&_th]:text-xs [&_th]:px-2 [&_th]:py-1.5 [&_td]:text-xs [&_td]:px-2 [&_td]:py-1.5">
             <colgroup>
               <col className="w-[90px]" />
@@ -757,6 +758,183 @@ export default function TodoPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden space-y-3">
+          {sortedBookings.length === 0 ? (
+            <p className="text-center py-8 text-gray-500">
+              {showCompleted
+                ? 'No bookings found'
+                : 'No pending tasks — everything is up to date'}
+            </p>
+          ) : (
+            sortedBookings.map((b) => {
+              const todoStatus = computeTodoStatus(b);
+              const phaseStyle = PHASE_STYLE[todoStatus];
+              const platformBadge = getPlatformBadge(b.platform?.name);
+              return (
+                <div
+                  key={b.id}
+                  className="border border-gray-200 rounded-2xl p-3"
+                  style={phaseStyle ? { backgroundColor: hexToRgba(phaseStyle.bg, 0.35) } : undefined}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        title={b.platform?.name || 'No platform'}
+                        className={`shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${
+                          platformBadge.textClassName || 'text-white'
+                        } ${platformBadge.className}`}
+                      >
+                        {platformBadge.text}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="text-xs text-gray-500">{b.apartment?.name}</div>
+                        <div className="font-medium">{b.guest_name}</div>
+                        <div className="text-gray-400 text-xs truncate">{b.booking_ref}</div>
+                      </div>
+                    </div>
+                    <span
+                      className="shrink-0 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap"
+                      style={
+                        phaseStyle
+                          ? { backgroundColor: phaseStyle.bg, color: phaseStyle.text }
+                          : undefined
+                      }
+                    >
+                      {PHASE_LABEL[todoStatus] || todoStatus}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm mt-3 pt-3 border-t border-black/10">
+                    <div>
+                      <div className="text-xs text-gray-500">Check-in</div>
+                      <div className="font-medium">{formatDate(b.check_in_date)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Check-out</div>
+                      <div className="font-medium">{formatDate(b.check_out_date)}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-3 border-t border-black/10 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Guest Instructions</span>
+                      <StatusSquare
+                        value={b.guest_instructions}
+                        doneValue="DONE"
+                        onChange={(value) =>
+                          handleTaskStatusChange(b, 'guest_instructions', null, value)
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Police Registration</span>
+                      <div className="flex items-center gap-1.5">
+                        <StatusSquare
+                          value={b.police_registration}
+                          doneValue="DONE"
+                          onChange={(value) =>
+                            handleTaskStatusChange(b, 'police_registration', null, value)
+                          }
+                        />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          ref={(el) => {
+                            fileInputRefs.current[b.id] = el;
+                          }}
+                          className="hidden"
+                          onChange={(e) =>
+                            handlePoliceFileChange(b, e.target.files?.[0] || undefined)
+                          }
+                        />
+                        {b.police_registration_file ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleViewPoliceFile(b.police_registration_file!)}
+                              title="View attached photo"
+                              className="p-1 hover:bg-gray-200 rounded"
+                            >
+                              <ImageIcon size={14} className="text-gray-600" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePoliceFile(b)}
+                              title="Remove photo"
+                              className="p-1 hover:bg-red-100 rounded"
+                            >
+                              <X size={14} className="text-red-500" />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => fileInputRefs.current[b.id]?.click()}
+                            title="Attach photo"
+                            className="p-1 hover:bg-gray-200 rounded"
+                          >
+                            <Plus size={14} className="text-gray-500" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Owner Invoice</span>
+                      <StatusSquare
+                        value={b.platform_invoice}
+                        doneValue="SENT"
+                        onChange={(value) =>
+                          handleTaskStatusChange(b, 'platform_invoice', 'platform_invoice_date', value)
+                        }
+                      />
+                    </div>
+                    <div
+                      className="flex items-center justify-between"
+                      title={
+                        !revenueBookingIds.has(b.id)
+                          ? 'No Revenue assigned to this booking yet'
+                          : undefined
+                      }
+                    >
+                      <span className="text-sm">CA Inv and Liquidation</span>
+                      <StatusSquare
+                        value={b.final_liquidation}
+                        doneValue="SENT"
+                        onChange={(value) =>
+                          handleTaskStatusChange(b, 'final_liquidation', 'final_liquidation_date', value)
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Expenses</span>
+                      <button
+                        type="button"
+                        onClick={() => handleInvExpToggle(b)}
+                        title={`Expenses ${b.inv_exp_done ? 'done' : 'pending'} — click to change`}
+                        className="inline-flex items-center justify-center"
+                      >
+                        <span
+                          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition ${
+                            b.inv_exp_done
+                              ? 'bg-green-500 border-green-500'
+                              : 'bg-white border-gray-300 hover:border-gray-400'
+                          }`}
+                        >
+                          {b.inv_exp_done && (
+                            <Check size={16} className="text-white" strokeWidth={3} />
+                          )}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
         </div>
       )}
     </div>

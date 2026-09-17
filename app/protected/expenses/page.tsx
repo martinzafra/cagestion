@@ -833,7 +833,8 @@ export default function ExpensesPage() {
             </div>
           </div>
 
-          <div className="card overflow-x-auto">
+          <div className="card">
+          <div className="hidden md:block overflow-x-auto">
           <table className="table">
             <thead>
               <tr>
@@ -913,6 +914,88 @@ export default function ExpensesPage() {
               </tfoot>
             )}
           </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {sortedExpenses.length === 0 ? (
+              <p className="text-center py-8 text-gray-500">No expenses recorded</p>
+            ) : (
+              <>
+                <div className="border border-gray-200 rounded-2xl p-3 bg-gray-50">
+                  <div className="flex justify-between text-sm font-semibold">
+                    <span>Total</span>
+                    <span>{formatCurrency(expenseTotals.total)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>Amount {formatCurrency(expenseTotals.amount)}</span>
+                    <span>VAT {formatCurrency(expenseTotals.vat)}</span>
+                  </div>
+                </div>
+                {sortedExpenses.map((exp) => (
+                  <div key={exp.id} className="border border-gray-200 rounded-2xl p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="font-medium">{exp.vendor}</div>
+                        <div className="text-gray-400 text-xs">
+                          {EXPENSE_TYPE_LABELS[exp.expense_type] || exp.expense_type} · {exp.category?.name}
+                        </div>
+                      </div>
+                      <div className="font-semibold shrink-0">{formatCurrency(exp.total)}</div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm mt-3 pt-3 border-t border-gray-100">
+                      <div>
+                        <div className="text-xs text-gray-500">Date</div>
+                        <div className="font-medium">{formatDate(exp.expense_date)}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500">Apartment</div>
+                        <div className="font-medium">{exp.apartment?.name || 'General'}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500">Amount €</div>
+                        <div className="font-medium">{formatCurrency(exp.amount)}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500">VAT €</div>
+                        <div className="font-medium">{formatCurrency(exp.vat)}</div>
+                      </div>
+                      <div className="col-span-full">
+                        <div className="text-xs text-gray-500">Booking</div>
+                        <div className="font-medium">{exp.booking?.guest_name || 'General'}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-1 mt-3 pt-3 border-t border-gray-100">
+                      {exp.attachment_url && (
+                        <button
+                          type="button"
+                          onClick={() => handleViewAttachment(exp.attachment_url)}
+                          title="View attachment"
+                          className="p-1.5 hover:bg-gray-100 rounded"
+                        >
+                          <Paperclip size={18} className="text-gray-600" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleEditExpense(exp.id)}
+                        className="p-1.5 hover:bg-blue-100 rounded"
+                      >
+                        <Pencil size={18} className="text-blue-600" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(exp.id)}
+                        className="p-1.5 hover:bg-red-100 rounded"
+                      >
+                        <Trash2 size={18} className="text-red-600" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
           </div>
         </>
       )}

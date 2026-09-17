@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Cormorant_Garamond, Inter } from 'next/font/google';
 import './globals.css';
 
@@ -20,6 +20,14 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'Casa Amiga - Property Management',
   description: 'Tourism accommodation management system',
+};
+
+// viewport-fit: cover lets env(safe-area-inset-*) report real values on
+// notched/Dynamic Island iPhones, so the fixed nav bar can clear them.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
