@@ -819,7 +819,7 @@ export default function RevenuePage() {
                 <SortableHeader column="amount" align="right">Amount €</SortableHeader>
                 <SortableHeader column="amount_with_vat" align="right">Amount w/ VAT €</SortableHeader>
                 <SortableHeader column="status">Status</SortableHeader>
-                <th>Actions</th>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -859,7 +859,7 @@ export default function RevenuePage() {
                       </span>
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 justify-end">
                         <span className="w-6 flex justify-center">
                           {rev.attachment_url && (
                             <button
