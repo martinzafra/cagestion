@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import StatusSquare from '@/components/StatusSquare';
 import { formatDate } from '@/lib/calculations';
-import { ChevronUp, ChevronDown, Plus, Image as ImageIcon, X, Check, FileSpreadsheet } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronRight, Plus, Image as ImageIcon, X, Check, FileSpreadsheet } from 'lucide-react';
 import Switch from '@/components/Switch';
 import { fetchAllowedApartments } from '@/lib/apartmentAccess';
 import { fetchCurrentUserRole } from '@/lib/userRole';
@@ -431,15 +431,16 @@ export default function TodoPage() {
       </div>
 
       {/* Workflow legend */}
-      <div className="card overflow-x-auto">
-        <div className="flex min-w-[660px]">
+      <div className="card">
+        {/* Desktop: interlocking chevron strip */}
+        <div className="hidden md:flex">
           {WORKFLOW_PHASES.map((phase, idx) => {
             const isFirst = idx === 0;
             const isLast = idx === WORKFLOW_PHASES.length - 1;
             return (
               <div
                 key={phase.key}
-                className="flex-1 flex items-center justify-center text-[11px] sm:text-xs font-bold uppercase tracking-wide py-3 text-center px-3"
+                className="flex-1 flex items-center justify-center text-xs font-bold uppercase tracking-wide py-3 text-center px-3"
                 style={{
                   backgroundColor: phase.bg,
                   color: phase.text,
@@ -455,6 +456,30 @@ export default function TodoPage() {
               </div>
             );
           })}
+        </div>
+
+        {/* Mobile: wrapping pill strip - the chevron shapes above can't wrap,
+            so this trades the arrow interlock for numbered badges that wrap
+            onto as many rows as the screen needs. */}
+        <div className="md:hidden flex flex-wrap items-center gap-x-1.5 gap-y-2">
+          {WORKFLOW_PHASES.map((phase, idx) => (
+            <React.Fragment key={phase.key}>
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full py-1.5 pl-1.5 pr-3 text-[11px] font-bold uppercase tracking-wide"
+                style={{ backgroundColor: phase.bg, color: phase.text }}
+              >
+                <span
+                  className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-white/60 text-[10px]"
+                >
+                  {idx + 1}
+                </span>
+                {phase.label}
+              </span>
+              {idx < WORKFLOW_PHASES.length - 1 && (
+                <ChevronRight size={14} className="text-gray-300 shrink-0" />
+              )}
+            </React.Fragment>
+          ))}
         </div>
       </div>
 
@@ -648,13 +673,6 @@ export default function TodoPage() {
                       </td>
                       <td>
                         <div className="flex flex-wrap gap-1.5 items-center justify-center">
-                          <StatusSquare
-                            value={b.police_registration}
-                            doneValue="DONE"
-                            onChange={(value) =>
-                              handleTaskStatusChange(b, 'police_registration', null, value)
-                            }
-                          />
                           <input
                             type="file"
                             accept="image/*"
@@ -695,6 +713,13 @@ export default function TodoPage() {
                               <Plus size={14} className="text-gray-500" />
                             </button>
                           )}
+                          <StatusSquare
+                            value={b.police_registration}
+                            doneValue="DONE"
+                            onChange={(value) =>
+                              handleTaskStatusChange(b, 'police_registration', null, value)
+                            }
+                          />
                         </div>
                       </td>
                       <td className="text-center">
