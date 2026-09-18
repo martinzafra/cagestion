@@ -266,8 +266,13 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
         ) : (
           sortedBookings.map((booking) => {
             const platformBadge = getPlatformBadge(booking.platform?.name);
+            const isExpanded = expandedId === booking.id;
             return (
-              <div key={booking.id} className="border border-gray-200 rounded-2xl p-3">
+              <div
+                key={booking.id}
+                className="border border-gray-200 rounded-2xl p-3 cursor-pointer"
+                onClick={() => setExpandedId(isExpanded ? null : booking.id)}
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <span
@@ -278,19 +283,18 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
                     >
                       {platformBadge.text}
                     </span>
-                    <span
-                      title={booking.agent?.name || 'No agent'}
-                      className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full bg-azure text-white text-xs font-bold"
-                    >
-                      {getAgentBadgeText(booking.agent?.name)}
-                    </span>
                     <div className="min-w-0">
                       <div className="font-medium">{booking.guest_name}</div>
                       <div className="text-gray-400 text-xs truncate">{booking.booking_ref}</div>
                     </div>
                   </div>
-                  <div className="shrink-0">
+                  <div className="shrink-0 flex items-center gap-1.5">
                     <StatusBadge status={booking.status} wrap />
+                    {isExpanded ? (
+                      <ChevronUp size={16} className="text-gray-400" />
+                    ) : (
+                      <ChevronDown size={16} className="text-gray-400" />
+                    )}
                   </div>
                 </div>
 
@@ -311,31 +315,41 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
                     <div className="text-xs text-gray-500">Check-out</div>
                     <div className="font-medium">{formatDate(booking.check_out_date)}</div>
                   </div>
-                  <div>
-                    <div className="text-xs text-gray-500">Phone</div>
-                    <div className="font-medium">{booking.guest_phone || '-'}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500">Email</div>
-                    <div className="font-medium truncate">{booking.guest_email || '-'}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500">Police Registration</div>
-                    <div className="font-medium">{booking.police_registration}</div>
-                  </div>
-                  <div>
+                  <div className="col-span-full">
                     <div className="text-xs text-gray-500">Owner Invoice</div>
                     <div className="font-medium">{booking.platform_invoice}</div>
                   </div>
-                  {booking.comments && (
-                    <div className="col-span-full">
-                      <div className="text-xs text-gray-500">Comments</div>
-                      <div className="font-medium">{booking.comments}</div>
-                    </div>
-                  )}
                 </div>
 
-                <div className="flex justify-end gap-1 mt-3 pt-3 border-t border-gray-100">
+                {isExpanded && (
+                  <div className="text-sm mt-3 pt-3 border-t border-gray-100 space-y-2">
+                    <div>
+                      <div className="text-xs text-gray-500">Guest Phone</div>
+                      <div className="font-medium">{booking.guest_phone || '-'}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">Guest Email</div>
+                      <div className="font-medium">{booking.guest_email || '-'}</div>
+                    </div>
+                    {booking.comments && (
+                      <div>
+                        <div className="text-xs text-gray-500">Comments</div>
+                        <div className="font-medium">{booking.comments}</div>
+                      </div>
+                    )}
+                    {booking.guest_comments && (
+                      <div>
+                        <div className="text-xs text-gray-500">Guest Comments</div>
+                        <div className="font-medium">{booking.guest_comments}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div
+                  className="flex justify-end gap-1 mt-3 pt-3 border-t border-gray-100"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     onClick={() => onEdit(booking.id)}
                     className="p-1.5 hover:bg-blue-100 rounded"
