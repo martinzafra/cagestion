@@ -127,7 +127,7 @@ interface TaxReportRow {
   attachmentUrl: string | null;
 }
 
-type TaxSortColumn = 'date' | 'invoiceNumber' | 'thirdParty' | 'itemCategory' | 'amount' | 'vat' | 'total';
+type TaxSortColumn = 'date' | 'source' | 'invoiceNumber' | 'thirdParty' | 'itemCategory' | 'amount' | 'vat' | 'total';
 
 // Quarter/year quick-select bounds for the Tax Report date filter, anchored
 // to the year of whichever date is currently in the "start" field so
@@ -1811,6 +1811,7 @@ export default function ReportsPage() {
                 <thead>
                   <tr>
                     <TaxSortableHeader column="date">Date</TaxSortableHeader>
+                    <TaxSortableHeader column="source">Type</TaxSortableHeader>
                     <TaxSortableHeader column="invoiceNumber">Invoice #</TaxSortableHeader>
                     <TaxSortableHeader column="thirdParty">3rd Party</TaxSortableHeader>
                     <TaxSortableHeader column="itemCategory">Item/Category</TaxSortableHeader>
@@ -1824,6 +1825,9 @@ export default function ReportsPage() {
                   {sortedTaxReportRows.map((row) => (
                     <tr key={`${row.source}-${row.id}`}>
                       <td>{formatDate(row.date)}</td>
+                      <td className={row.source === 'revenue' ? 'text-green-600' : 'text-red-600'}>
+                        {row.source === 'revenue' ? 'Revenue' : 'Expense'}
+                      </td>
                       <td>{row.invoiceNumber || '-'}</td>
                       <td>{row.thirdParty}</td>
                       <td>{row.itemCategory}</td>
@@ -1856,7 +1860,7 @@ export default function ReportsPage() {
                 </tbody>
                 <tfoot>
                   <tr className="font-semibold border-t-2">
-                    <td colSpan={4}>Total</td>
+                    <td colSpan={5}>Total</td>
                     <td className="text-right">
                       {formatCurrency(taxReportRows.reduce((sum, r) => sum + r.amount, 0))}
                     </td>
