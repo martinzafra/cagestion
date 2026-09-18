@@ -8,12 +8,16 @@ import {
   DollarSign,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   BedDouble,
   FileSpreadsheet,
+  Paperclip,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatCurrency, formatDate } from '@/lib/calculations';
 import { exportToExcel } from '@/lib/exportExcel';
+import { compareSortValues } from '@/lib/sort';
 import Switch from '@/components/Switch';
 
 // ---- Apartment Annual Report -----------------------------------------
@@ -103,6 +107,52 @@ interface PlatformAnalysisData {
   totals: PlatformRow;
 }
 
+// ---- Tax Report --------------------------------------------------------
+// One combined ledger of every real tax invoice: revenue invoices issued
+// BY Casa Amiga to the owner (revenue_type 'INVOICE', shown positive) and
+// invoices received FROM vendors/platforms (expense_type 'INVOICE', shown
+// negative) - the two groups that actually carry VAT to declare, as
+// opposed to Collections or non-invoice expense types (Payment, Owners
+// Expense).
+interface TaxReportRow {
+  id: string;
+  source: 'revenue' | 'expense';
+  date: string;
+  invoiceNumber: string | null;
+  thirdParty: string;
+  itemCategory: string;
+  amount: number;
+  vat: number;
+  total: number;
+  attachmentUrl: string | null;
+}
+
+type TaxSortColumn = 'date' | 'invoiceNumber' | 'thirdParty' | 'itemCategory' | 'amount' | 'vat' | 'total';
+
+// Quarter/year quick-select bounds for the Tax Report date filter, anchored
+// to the year of whichever date is currently in the "start" field so
+// clicking a quarter after navigating to a different year stays on that year.
+function getQuarterBounds(
+  period: 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'ANNUAL',
+  referenceISO: string
+): { start: string; end: string } {
+  const year = Number(referenceISO.split('-')[0]) || new Date().getFullYear();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const lastDay = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const ranges: Record<string, [number, number]> = {
+    Q1: [1, 3],
+    Q2: [4, 6],
+    Q3: [7, 9],
+    Q4: [10, 12],
+    ANNUAL: [1, 12],
+  };
+  const [startMonth, endMonth] = ranges[period];
+  return {
+    start: `${year}-${pad(startMonth)}-01`,
+    end: `${year}-${pad(endMonth)}-${pad(lastDay(year, endMonth))}`,
+  };
+}
+
 function ReportKpiCard({
   label,
   value,
@@ -156,9 +206,27 @@ export default function ReportsPage() {
   const [reportLoading, setReportLoading] = useState(false);
   const [exportingBookings, setExportingBookings] = useState(false);
 
-  const [activeReportTab, setActiveReportTab] = useState<'annual' | 'platform'>('annual');
+  const [activeReportTab, setActiveReportTab] = useState<'annual' | 'platform' | 'tax'>('annual');
   const [platformAnalysis, setPlatformAnalysis] = useState<PlatformAnalysisData | null>(null);
   const [platformAnalysisLoading, setPlatformAnalysisLoading] = useState(false);
+
+  const [taxDateRange, setTaxDateRange] = useState(() => {
+    // Built from local Y/M/D parts rather than toISOString(), which converts
+    // to UTC and can roll the date back a day in timezones ahead of UTC.
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return {
+      start: `${now.getFullYear()}-01-01`,
+      end: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+    };
+  });
+  const [taxReportRows, setTaxReportRows] = useState<TaxReportRow[]>([]);
+  const [taxReportLoading, setTaxReportLoading] = useState(false);
+  const [taxPeriod, setTaxPeriod] = useState<'Q1' | 'Q2' | 'Q3' | 'Q4' | 'ANNUAL'>('ANNUAL');
+  const [taxYear, setTaxYear] = useState(new Date().getFullYear());
+  const [taxYearOptions, setTaxYearOptions] = useState<number[]>([]);
+  const [taxSortColumn, setTaxSortColumn] = useState<TaxSortColumn | null>(null);
+  const [taxSortDirection, setTaxSortDirection] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     checkAuth();
@@ -189,6 +257,22 @@ export default function ReportsPage() {
       fetchPlatformAnalysis();
     }
   }, [activeReportTab, selectedApartmentId, periodOffset, showConfirmedDone]);
+
+  useEffect(() => {
+    if (activeReportTab === 'tax') {
+      fetchTaxReport();
+    }
+  }, [activeReportTab, taxDateRange]);
+
+  useEffect(() => {
+    if (activeReportTab === 'tax' && taxYearOptions.length === 0) {
+      fetchTaxYearOptions();
+    }
+  }, [activeReportTab]);
+
+  useEffect(() => {
+    setTaxDateRange(getQuarterBounds(taxPeriod, `${taxYear}-01-01`));
+  }, [taxPeriod, taxYear]);
 
   const checkAuth = async () => {
     try {
@@ -682,6 +766,160 @@ export default function ReportsPage() {
     }
   };
 
+  const fetchTaxYearOptions = async () => {
+    try {
+      const [revenueRes, expensesRes] = await Promise.all([
+        supabase.from('revenue_invoicing').select('revenue_date').eq('revenue_type', 'INVOICE'),
+        supabase.from('expenses').select('expense_date').eq('expense_type', 'INVOICE'),
+      ]);
+      if (revenueRes.error) throw revenueRes.error;
+      if (expensesRes.error) throw expensesRes.error;
+
+      const years = new Set<number>();
+      (revenueRes.data || []).forEach((r: any) => years.add(Number(r.revenue_date.slice(0, 4))));
+      (expensesRes.data || []).forEach((e: any) => years.add(Number(e.expense_date.slice(0, 4))));
+
+      const sorted = Array.from(years).sort((a, b) => b - a);
+      setTaxYearOptions(sorted);
+      // Default to the most recent year that actually has data, if the
+      // current-year default doesn't have any.
+      if (sorted.length > 0 && !sorted.includes(taxYear)) {
+        setTaxYear(sorted[0]);
+      }
+    } catch (error) {
+      toast.error('Failed to load available tax years');
+    }
+  };
+
+  const fetchTaxReport = async () => {
+    setTaxReportLoading(true);
+    try {
+      const [revenueRes, expensesRes] = await Promise.all([
+        supabase
+          .from('revenue_invoicing')
+          .select(
+            'id, revenue_date, invoice_number, amount, vat, amount_with_vat, attachment_url, item:inventory_invoice_items(name)'
+          )
+          .eq('revenue_type', 'INVOICE')
+          .gte('revenue_date', taxDateRange.start)
+          .lte('revenue_date', taxDateRange.end),
+        supabase
+          .from('expenses')
+          .select(
+            'id, expense_date, invoice_number, vendor, amount, vat, total, attachment_url, category:inventory_expense_types(name)'
+          )
+          .eq('expense_type', 'INVOICE')
+          .gte('expense_date', taxDateRange.start)
+          .lte('expense_date', taxDateRange.end),
+      ]);
+      if (revenueRes.error) throw revenueRes.error;
+      if (expensesRes.error) throw expensesRes.error;
+
+      const revenueRows: TaxReportRow[] = (revenueRes.data || []).map((r: any) => ({
+        id: r.id,
+        source: 'revenue',
+        date: r.revenue_date,
+        invoiceNumber: r.invoice_number,
+        thirdParty: 'Casa Amiga',
+        itemCategory: r.item?.name || '',
+        amount: r.amount || 0,
+        vat: r.vat || 0,
+        total: r.amount_with_vat || 0,
+        attachmentUrl: r.attachment_url || null,
+      }));
+
+      const expenseRows: TaxReportRow[] = (expensesRes.data || []).map((e: any) => ({
+        id: e.id,
+        source: 'expense',
+        date: e.expense_date,
+        invoiceNumber: e.invoice_number,
+        thirdParty: e.vendor,
+        itemCategory: e.category?.name || '',
+        amount: -(e.amount || 0),
+        vat: -(e.vat || 0),
+        total: -(e.total || 0),
+        attachmentUrl: e.attachment_url || null,
+      }));
+
+      setTaxReportRows(
+        [...revenueRows, ...expenseRows].sort((a, b) => a.date.localeCompare(b.date))
+      );
+    } catch (error) {
+      toast.error('Failed to load tax report');
+    } finally {
+      setTaxReportLoading(false);
+    }
+  };
+
+  const handleExportTaxReport = () => {
+    if (taxReportRows.length === 0) {
+      toast.error('No invoices to export for this period');
+      return;
+    }
+    exportToExcel(`tax-report-${taxDateRange.start}-to-${taxDateRange.end}`, taxReportRows, [
+      { header: 'Date', value: (r) => r.date },
+      { header: 'Revenue/Expense', value: (r) => (r.source === 'revenue' ? 'Revenue' : 'Expense') },
+      { header: 'Invoice #', value: (r) => r.invoiceNumber },
+      { header: '3rd Party', value: (r) => r.thirdParty },
+      { header: 'Item/Category', value: (r) => r.itemCategory },
+      { header: 'Amount', value: (r) => r.amount },
+      { header: 'VAT Amount', value: (r) => r.vat },
+      { header: 'Total Amount', value: (r) => r.total },
+    ]);
+  };
+
+  const handleTaxSort = (column: TaxSortColumn) => {
+    if (taxSortColumn !== column) {
+      setTaxSortColumn(column);
+      setTaxSortDirection('asc');
+    } else if (taxSortDirection === 'asc') {
+      setTaxSortDirection('desc');
+    } else {
+      setTaxSortColumn(null);
+    }
+  };
+
+  const sortedTaxReportRows = taxSortColumn
+    ? [...taxReportRows].sort((a, b) => {
+        const cmp = compareSortValues(a[taxSortColumn] ?? '', b[taxSortColumn] ?? '');
+        return taxSortDirection === 'asc' ? cmp : -cmp;
+      })
+    : taxReportRows;
+
+  const TaxSortableHeader: React.FC<{
+    column: TaxSortColumn;
+    children: React.ReactNode;
+    align?: 'left' | 'right' | 'center';
+  }> = ({ column, children, align = 'left' }) => (
+    <th
+      className={`cursor-pointer select-none hover:bg-gray-200 ${
+        align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : ''
+      }`}
+      onClick={() => handleTaxSort(column)}
+    >
+      <span
+        className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : ''}`}
+      >
+        {children}
+        {taxSortColumn === column &&
+          (taxSortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+      </span>
+    </th>
+  );
+
+  const handleViewTaxAttachment = async (row: TaxReportRow) => {
+    if (!row.attachmentUrl) return;
+    try {
+      const { data, error } = await supabase.storage
+        .from(row.source === 'revenue' ? 'revenue-attachments' : 'expense-attachments')
+        .createSignedUrl(row.attachmentUrl, 60);
+      if (error) throw error;
+      if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to open attachment');
+    }
+  };
+
   const handleExportBookingsReport = async () => {
     if (!apartmentReport) return;
 
@@ -885,6 +1123,12 @@ export default function ReportsPage() {
             className={activeReportTab === 'platform' ? 'btn-primary' : 'btn-secondary'}
           >
             Platform Analysis
+          </button>
+          <button
+            onClick={() => setActiveReportTab('tax')}
+            className={activeReportTab === 'tax' ? 'btn-primary' : 'btn-secondary'}
+          >
+            Tax Report
           </button>
         </div>
         <Switch
@@ -1407,6 +1651,229 @@ export default function ReportsPage() {
               )}
             </>
           ) : null}
+        </div>
+      )}
+
+      {activeReportTab === 'tax' && (
+        <div className="card">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+            <h2 className="text-xl font-bold text-gray-900">Tax Report</h2>
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="label">Period</label>
+                <select
+                  value={taxPeriod}
+                  onChange={(e) => setTaxPeriod(e.target.value as typeof taxPeriod)}
+                  className="select"
+                >
+                  <option value="Q1">Q1</option>
+                  <option value="Q2">Q2</option>
+                  <option value="Q3">Q3</option>
+                  <option value="Q4">Q4</option>
+                  <option value="ANNUAL">Anual</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">Year</label>
+                <select
+                  value={taxYear}
+                  onChange={(e) => setTaxYear(Number(e.target.value))}
+                  className="select"
+                >
+                  {!taxYearOptions.includes(taxYear) && (
+                    <option value={taxYear}>{taxYear}</option>
+                  )}
+                  {taxYearOptions.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Start Date</label>
+                <input
+                  type="date"
+                  value={taxDateRange.start}
+                  onChange={(e) => setTaxDateRange({ ...taxDateRange, start: e.target.value })}
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label">End Date</label>
+                <input
+                  type="date"
+                  value={taxDateRange.end}
+                  onChange={(e) => setTaxDateRange({ ...taxDateRange, end: e.target.value })}
+                  className="input"
+                />
+              </div>
+              <button
+                onClick={handleExportTaxReport}
+                disabled={taxReportRows.length === 0}
+                className="btn-secondary flex items-center gap-2 disabled:opacity-50"
+              >
+                <FileSpreadsheet size={18} />
+                Export
+              </button>
+            </div>
+          </div>
+
+          {taxReportLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : (
+            <>
+              {(() => {
+                const ingreso = taxReportRows
+                  .filter((r) => r.source === 'revenue')
+                  .reduce((sum, r) => sum + r.amount, 0);
+                const gasto = -taxReportRows
+                  .filter((r) => r.source === 'expense')
+                  .reduce((sum, r) => sum + r.amount, 0);
+                const resultado = ingreso - gasto;
+                const ivaRepercutido = taxReportRows
+                  .filter((r) => r.source === 'revenue')
+                  .reduce((sum, r) => sum + r.vat, 0);
+                const ivaSoportado = -taxReportRows
+                  .filter((r) => r.source === 'expense')
+                  .reduce((sum, r) => sum + r.vat, 0);
+                const ivaAPagarCobrar = ivaRepercutido - ivaSoportado;
+                const irpfAprox = resultado * 0.2;
+
+                return (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <div className="card">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-gray-600 text-sm">Ingreso</p>
+                            <p className="text-3xl font-bold text-green-600 mt-1">
+                              {formatCurrency(ingreso)}
+                            </p>
+                          </div>
+                          <DollarSign size={40} className="text-green-600 opacity-20" />
+                        </div>
+                      </div>
+
+                      <div className="card">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-gray-600 text-sm">Gasto</p>
+                            <p className="text-3xl font-bold text-red-600 mt-1">
+                              {formatCurrency(gasto)}
+                            </p>
+                          </div>
+                          <TrendingUp size={40} className="text-red-600 opacity-20" />
+                        </div>
+                      </div>
+
+                      <div className="card">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-gray-600 text-sm">Resultado</p>
+                            <p
+                              className={`text-3xl font-bold mt-1 ${
+                                resultado >= 0 ? 'text-green-600' : 'text-red-600'
+                              }`}
+                            >
+                              {formatCurrency(resultado)}
+                            </p>
+                          </div>
+                          <BarChart3 size={40} className="text-gray-600 opacity-20" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                      <ReportKpiCard label="IVA Repercutido" value={formatCurrency(ivaRepercutido)} />
+                      <ReportKpiCard label="IVA Soportado" value={formatCurrency(ivaSoportado)} />
+                      <ReportKpiCard
+                        label="IVA a Pagar/Cobrar"
+                        value={formatCurrency(ivaAPagarCobrar)}
+                        valueClassName={ivaAPagarCobrar >= 0 ? 'text-red-600' : 'text-green-600'}
+                      />
+                      <ReportKpiCard
+                        label="IRPF aprox (20%)"
+                        value={formatCurrency(irpfAprox)}
+                        valueClassName="text-red-600"
+                      />
+                    </div>
+                  </>
+                );
+              })()}
+
+              {taxReportRows.length === 0 ? (
+                <p className="text-center py-8 text-gray-500">No invoices in this period</p>
+              ) : (
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <TaxSortableHeader column="date">Date</TaxSortableHeader>
+                    <TaxSortableHeader column="invoiceNumber">Invoice #</TaxSortableHeader>
+                    <TaxSortableHeader column="thirdParty">3rd Party</TaxSortableHeader>
+                    <TaxSortableHeader column="itemCategory">Item/Category</TaxSortableHeader>
+                    <TaxSortableHeader column="amount" align="right">Amount</TaxSortableHeader>
+                    <TaxSortableHeader column="vat" align="right">VAT Amount</TaxSortableHeader>
+                    <TaxSortableHeader column="total" align="right">Total Amount</TaxSortableHeader>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedTaxReportRows.map((row) => (
+                    <tr key={`${row.source}-${row.id}`}>
+                      <td>{formatDate(row.date)}</td>
+                      <td>{row.invoiceNumber || '-'}</td>
+                      <td>{row.thirdParty}</td>
+                      <td>{row.itemCategory}</td>
+                      <td className={`text-right ${row.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatCurrency(row.amount)}
+                      </td>
+                      <td className={`text-right ${row.vat >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatCurrency(row.vat)}
+                      </td>
+                      <td
+                        className={`text-right font-semibold ${
+                          row.total >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}
+                      >
+                        {formatCurrency(row.total)}
+                      </td>
+                      <td>
+                        {row.attachmentUrl && (
+                          <button
+                            onClick={() => handleViewTaxAttachment(row)}
+                            title="View attachment"
+                            className="p-1 hover:bg-gray-100 rounded"
+                          >
+                            <Paperclip size={16} className="text-gray-600" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="font-semibold border-t-2">
+                    <td colSpan={4}>Total</td>
+                    <td className="text-right">
+                      {formatCurrency(taxReportRows.reduce((sum, r) => sum + r.amount, 0))}
+                    </td>
+                    <td className="text-right">
+                      {formatCurrency(taxReportRows.reduce((sum, r) => sum + r.vat, 0))}
+                    </td>
+                    <td className="text-right">
+                      {formatCurrency(taxReportRows.reduce((sum, r) => sum + r.total, 0))}
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
