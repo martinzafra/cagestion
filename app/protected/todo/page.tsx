@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import StatusSquare from '@/components/StatusSquare';
 import { formatDate } from '@/lib/calculations';
-import { ChevronUp, ChevronDown, ChevronRight, Plus, Image as ImageIcon, X, Check, FileSpreadsheet } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronRight, Plus, Image as ImageIcon, Paperclip, X, Check, FileSpreadsheet } from 'lucide-react';
 import Switch from '@/components/Switch';
 import { fetchAllowedApartments } from '@/lib/apartmentAccess';
 import { fetchCurrentUserRole } from '@/lib/userRole';
@@ -45,6 +46,7 @@ interface BookingRow {
   platform_invoice_date: string | null;
   final_liquidation: InvoiceStatus;
   final_liquidation_date: string | null;
+  final_liquidation_file: string | null;
   inv_exp_done: boolean;
 }
 
@@ -169,7 +171,7 @@ export default function TodoPage() {
           guest_instructions,
           police_registration, police_registration_file,
           platform_invoice, platform_invoice_date,
-          final_liquidation, final_liquidation_date,
+          final_liquidation, final_liquidation_date, final_liquidation_file,
           inv_exp_done
         `)
         .neq('status', 'CANCELLED')
@@ -410,6 +412,18 @@ export default function TodoPage() {
       toast.success('Photo removed');
     } catch (error: any) {
       toast.error(error.message || 'Failed to remove photo');
+    }
+  };
+
+  const handleViewLiquidationFile = async (path: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('settlement-attachments')
+        .createSignedUrl(path, 60);
+      if (error) throw error;
+      if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to open settlement PDF');
     }
   };
 
@@ -744,18 +758,40 @@ export default function TodoPage() {
                             : undefined
                         }
                       >
-                        <StatusSquare
-                          value={b.final_liquidation}
-                          doneValue="SENT"
-                          onChange={(value) =>
-                            handleTaskStatusChange(
-                              b,
-                              'final_liquidation',
-                              'final_liquidation_date',
-                              value
+                        <div className="flex flex-wrap gap-1.5 items-center justify-center">
+                          {b.final_liquidation_file ? (
+                            <button
+                              type="button"
+                              onClick={() => handleViewLiquidationFile(b.final_liquidation_file!)}
+                              title="View settlement PDF"
+                              className="p-1 hover:bg-gray-200 rounded"
+                            >
+                              <Paperclip size={14} className="text-gray-600" />
+                            </button>
+                          ) : (
+                            userRole === 'admin' && (
+                              <Link
+                                href={`/protected/settlements?booking=${b.id}`}
+                                title="Generate settlement"
+                                className="p-1 hover:bg-gray-200 rounded"
+                              >
+                                <Plus size={14} className="text-gray-500" />
+                              </Link>
                             )
-                          }
-                        />
+                          )}
+                          <StatusSquare
+                            value={b.final_liquidation}
+                            doneValue="SENT"
+                            onChange={(value) =>
+                              handleTaskStatusChange(
+                                b,
+                                'final_liquidation',
+                                'final_liquidation_date',
+                                value
+                              )
+                            }
+                          />
+                        </div>
                       </td>
                       <td className="text-center">
                         <button
@@ -925,13 +961,35 @@ export default function TodoPage() {
                       }
                     >
                       <span className="text-sm">CA Inv and Liquidation</span>
-                      <StatusSquare
-                        value={b.final_liquidation}
-                        doneValue="SENT"
-                        onChange={(value) =>
-                          handleTaskStatusChange(b, 'final_liquidation', 'final_liquidation_date', value)
-                        }
-                      />
+                      <div className="flex items-center gap-1.5">
+                        {b.final_liquidation_file ? (
+                          <button
+                            type="button"
+                            onClick={() => handleViewLiquidationFile(b.final_liquidation_file!)}
+                            title="View settlement PDF"
+                            className="p-1 hover:bg-gray-200 rounded"
+                          >
+                            <Paperclip size={14} className="text-gray-600" />
+                          </button>
+                        ) : (
+                          userRole === 'admin' && (
+                            <Link
+                              href={`/protected/settlements?booking=${b.id}`}
+                              title="Generate settlement"
+                              className="p-1 hover:bg-gray-200 rounded"
+                            >
+                              <Plus size={14} className="text-gray-500" />
+                            </Link>
+                          )
+                        )}
+                        <StatusSquare
+                          value={b.final_liquidation}
+                          doneValue="SENT"
+                          onChange={(value) =>
+                            handleTaskStatusChange(b, 'final_liquidation', 'final_liquidation_date', value)
+                          }
+                        />
+                      </div>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Expenses</span>

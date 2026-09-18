@@ -12,6 +12,7 @@ type InventoryType = 'agents' | 'apartments' | 'platforms' | 'expense_types' | '
 interface TabItem {
   id: string;
   name: string;
+  owner_name?: string | null;
   commission_percentage?: number;
   contract?: 'None' | 'Yearly' | 'Unlimited';
   contract_date?: string | null;
@@ -271,7 +272,7 @@ export default function InventoryPage() {
 
   const handleApartmentFieldChange = (
     id: string,
-    field: 'commission_percentage' | 'contract' | 'contract_date' | 'active' | 'end_date',
+    field: 'owner_name' | 'commission_percentage' | 'contract' | 'contract_date' | 'active' | 'end_date',
     value: any
   ) => {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)));
@@ -485,9 +486,24 @@ export default function InventoryPage() {
               {activeTab === 'apartments' && (
                 <div
                   className={`mt-3 pt-3 border-t grid grid-cols-1 gap-2 ${
-                    item.active === false ? 'sm:grid-cols-4' : 'sm:grid-cols-3'
+                    item.active === false ? 'sm:grid-cols-5' : 'sm:grid-cols-4'
                   }`}
                 >
+                  <div>
+                    <label className="text-xs text-gray-500">Owner</label>
+                    <input
+                      type="text"
+                      placeholder="Owner name"
+                      value={item.owner_name ?? ''}
+                      onChange={(e) =>
+                        handleApartmentFieldChange(item.id, 'owner_name', e.target.value)
+                      }
+                      onBlur={(e) =>
+                        persistApartmentField(item.id, 'owner_name', e.target.value || null)
+                      }
+                      className="input text-base sm:text-sm"
+                    />
+                  </div>
                   <div>
                     <label className="text-xs text-gray-500">Commission %</label>
                     <input

@@ -27,6 +27,7 @@ const Navigation: React.FC<NavigationProps> = ({ userRole = 'agent', userName })
     { href: '/protected/expenses', label: 'Expenses', public: true },
     ...(userRole === 'admin'
       ? [
+          { href: '/protected/settlements', label: 'Settlements', public: false },
           { href: '/protected/reports', label: 'Reports', public: false },
           { href: '/protected/inventory', label: 'Inventory', public: false },
         ]
@@ -35,7 +36,7 @@ const Navigation: React.FC<NavigationProps> = ({ userRole = 'agent', userName })
 
   return (
     <nav
-      className="bg-azure text-white shadow-md fixed top-0 left-0 w-full z-50"
+      className="bg-azure text-white shadow-md fixed top-0 left-0 w-full z-50 print:hidden"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -44,6 +44,17 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+// Printed documents (Booking Settlement) follow the owner's own paperwork
+// convention - amount first, symbol after ("1,234.56 €") - rather than the
+// app's usual €-prefixed formatCurrency().
+export function formatCurrencyPaper(amount: number): string {
+  const formatted = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+  return `${formatted} €`;
+}
+
 export function formatDate(date: Date | string): string {
   // Date-only strings (YYYY-MM-DD) are parsed directly to avoid
   // timezone shifting the day when converted through a Date object.

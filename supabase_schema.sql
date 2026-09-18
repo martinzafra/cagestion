@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS inventory_agents (
 CREATE TABLE IF NOT EXISTS inventory_apartments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT UNIQUE NOT NULL, -- 'Barbarita', 'TMB', 'Catamaran', 'Casa Artur', 'Alexandrite'
+  owner_name TEXT, -- shown on the printed Booking Settlement statement
   commission_percentage DECIMAL(5, 2) DEFAULT 0,
   contract apartment_contract_type NOT NULL DEFAULT 'None',
   contract_date DATE,
@@ -108,6 +109,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   platform_invoice_date DATE,
   final_liquidation invoice_status DEFAULT 'TO BE DONE',
   final_liquidation_date DATE,
+  final_liquidation_file TEXT,
   inv_exp_done BOOLEAN NOT NULL DEFAULT FALSE,
 
   created_by UUID REFERENCES users(id),
