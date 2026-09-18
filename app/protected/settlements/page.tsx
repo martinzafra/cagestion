@@ -39,34 +39,15 @@ interface SettlementRecord {
   platformFee: number | null;
   caFee: number | null;
   caVat: number | null;
+  // Real Cleaning/Laundry expense cost to deduct alongside the fees above -
+  // 0 unless the apartment is flagged to settle the cleaning charge.
+  cleaningLaundryDeduction: number;
   toOwner: number | null;
   hasRevenue: boolean;
   status: 'pending' | 'sent';
   issuedDate: string;
   fileUrl: string | null;
   bookingStatus: string;
-}
-
-function StatCard({
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  label: string;
-  value: string;
-  sub: string;
-  tone: 'pending' | 'sent' | 'azure';
-}) {
-  const valueClass =
-    tone === 'pending' ? 'text-amber-700' : tone === 'sent' ? 'text-green-700' : 'text-azure';
-  return (
-    <div className="card">
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className={`font-display text-3xl font-bold mt-0.5 tabular-nums ${valueClass}`}>{value}</p>
-      <p className="text-xs text-gray-400 mt-1">{sub}</p>
-    </div>
-  );
 }
 
 function SettlementsPageInner() {
@@ -161,7 +142,7 @@ function SettlementsPageInner() {
              check_in_date, check_out_date, nights,
              price_basis, daily_price, total_rent, cleaning_charge, other_charge,
              final_liquidation, final_liquidation_date, final_liquidation_file,
-             apartment_id, apartment:inventory_apartments(name, owner_name),
+             apartment_id, apartment:inventory_apartments(name, owner_name, settle_cleaning_charge),
              platform:inventory_platforms(name)`
           )
           .neq('final_liquidation', 'NA')
@@ -188,12 +169,20 @@ function SettlementsPageInner() {
       });
 
       const platformFeeByBooking = new Map<string, number>();
+      const cleaningLaundryByBooking = new Map<string, number>();
       (expensesRes.data || []).forEach((e: any) => {
-        if (!e.booking_id || e.category?.name !== 'Platform Invoice') return;
-        platformFeeByBooking.set(
-          e.booking_id,
-          (platformFeeByBooking.get(e.booking_id) || 0) + (e.total || 0)
-        );
+        if (!e.booking_id) return;
+        if (e.category?.name === 'Platform Invoice') {
+          platformFeeByBooking.set(
+            e.booking_id,
+            (platformFeeByBooking.get(e.booking_id) || 0) + (e.total || 0)
+          );
+        } else if (e.category?.name === 'Cleaning' || e.category?.name === 'Laundry') {
+          cleaningLaundryByBooking.set(
+            e.booking_id,
+            (cleaningLaundryByBooking.get(e.booking_id) || 0) + (e.total || 0)
+          );
+        }
       });
 
       const nextRecords: SettlementRecord[] = [];
@@ -202,11 +191,27 @@ function SettlementsPageInner() {
 
         const pricePerNight = calculateDailyPricePerNight(b.daily_price || 0, b.price_basis || 'DAY');
         const rent = b.total_rent ?? round2(pricePerNight * (b.nights || 0));
-        const cleaningCharge = b.cleaning_charge || 0;
+        // Most apartments have Casa Amiga absorb the cleaning charge as its
+        // own margin - it's invisible to the owner settlement entirely
+        // (neither charged nor deducted). Only apartments flagged to settle
+        // it show the guest's charge and the real Cleaning/Laundry cost.
+        const settleCleaningCharge = !!b.apartment?.settle_cleaning_charge;
+        const cleaningCharge = settleCleaningCharge ? b.cleaning_charge || 0 : 0;
+        const cleaningLaundryDeduction = settleCleaningCharge
+          ? cleaningLaundryByBooking.get(b.id) || 0
+          : 0;
         const otherCharge = b.other_charge || 0;
         const platformFee = commission ? platformFeeByBooking.get(b.id) || 0 : null;
         const toOwner = commission
-          ? round2(rent + cleaningCharge + otherCharge - (platformFee || 0) - commission.fee - commission.vat)
+          ? round2(
+              rent +
+                cleaningCharge +
+                otherCharge -
+                (platformFee || 0) -
+                commission.fee -
+                commission.vat -
+                cleaningLaundryDeduction
+            )
           : null;
 
         nextRecords.push({
@@ -227,6 +232,7 @@ function SettlementsPageInner() {
           platformFee,
           caFee: commission ? commission.fee : null,
           caVat: commission ? commission.vat : null,
+          cleaningLaundryDeduction,
           toOwner,
           hasRevenue: !!commission,
           status: b.final_liquidation === 'SENT' ? 'sent' : 'pending',
@@ -251,8 +257,6 @@ function SettlementsPageInner() {
   });
   const pending = records.filter((r) => r.status === 'pending');
   const sent = records.filter((r) => r.status === 'sent');
-  const pendingMissingRevenue = pending.filter((r) => !r.hasRevenue).length;
-  const apartmentsInQueue = Array.from(new Set(records.map((r) => r.apartmentName))).sort();
 
   const handleViewFile = async (path: string) => {
     try {
@@ -376,6 +380,7 @@ function SettlementsPageInner() {
         platformFee: selected.platformFee,
         caFee: selected.caFee,
         caVat: selected.caVat,
+        cleaningLaundryDeduction: selected.cleaningLaundryDeduction,
         toOwner: selected.toOwner,
         issuedDate: settlementDateInput || selected.issuedDate,
         isSent: selected.status === 'sent',
@@ -393,30 +398,6 @@ function SettlementsPageInner() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 print:hidden">
-        <StatCard
-          label="Pending settlement"
-          value={String(pending.length)}
-          sub={
-            pendingMissingRevenue > 0
-              ? `${pendingMissingRevenue} still need Revenue assigned`
-              : 'Ready to preview and send'
-          }
-          tone="pending"
-        />
-        <StatCard
-          label="Sent"
-          value={String(sent.length)}
-          sub="Archived with a PDF on file"
-          tone="sent"
-        />
-        <StatCard
-          label="Apartments in queue"
-          value={String(apartmentsInQueue.length)}
-          sub={apartmentsInQueue.join(' · ') || 'None yet'}
-          tone="azure"
-        />
-      </div>
 
       {loading ? (
         <div className="flex justify-center py-12">

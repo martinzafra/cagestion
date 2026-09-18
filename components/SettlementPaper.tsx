@@ -20,6 +20,9 @@ export interface SettlementData {
   platformFee: number | null;
   caFee: number | null;
   caVat: number | null;
+  // Real Cleaning/Laundry cost, only ever nonzero for an apartment that
+  // settles the cleaning charge through to the owner.
+  cleaningLaundryDeduction: number;
   toOwner: number | null;
   issuedDate: string; // ISO yyyy-mm-dd
   isSent: boolean;
@@ -167,6 +170,9 @@ const SettlementPaper = React.forwardRef<HTMLDivElement, { data: SettlementData 
                 />
                 <MoneyRow label="Casa Amiga Fee" value={data.caFee} negative />
                 <MoneyRow label="Casa Amiga VAT" value={data.caVat} negative />
+                {data.cleaningLaundryDeduction > 0 && (
+                  <MoneyRow label="Cleaning & Laundry" value={data.cleaningLaundryDeduction} negative />
+                )}
 
                 <div className="flex justify-between items-center gap-4 bg-blue-50 rounded px-4 py-3.5 mt-4">
                   <span className="text-sm font-bold uppercase tracking-wide text-azure-hover">

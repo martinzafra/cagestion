@@ -13,6 +13,7 @@ interface TabItem {
   id: string;
   name: string;
   owner_name?: string | null;
+  settle_cleaning_charge?: boolean;
   commission_percentage?: number;
   contract?: 'None' | 'Yearly' | 'Unlimited';
   contract_date?: string | null;
@@ -272,7 +273,14 @@ export default function InventoryPage() {
 
   const handleApartmentFieldChange = (
     id: string,
-    field: 'owner_name' | 'commission_percentage' | 'contract' | 'contract_date' | 'active' | 'end_date',
+    field:
+      | 'owner_name'
+      | 'settle_cleaning_charge'
+      | 'commission_percentage'
+      | 'contract'
+      | 'contract_date'
+      | 'active'
+      | 'end_date',
     value: any
   ) => {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)));
@@ -486,7 +494,7 @@ export default function InventoryPage() {
               {activeTab === 'apartments' && (
                 <div
                   className={`mt-3 pt-3 border-t grid grid-cols-1 gap-2 ${
-                    item.active === false ? 'sm:grid-cols-5' : 'sm:grid-cols-4'
+                    item.active === false ? 'sm:grid-cols-6' : 'sm:grid-cols-5'
                   }`}
                 >
                   <div>
@@ -503,6 +511,18 @@ export default function InventoryPage() {
                       }
                       className="input text-base sm:text-sm"
                     />
+                  </div>
+                  <div className="flex items-end pb-2.5">
+                    <Switch
+                      checked={item.settle_cleaning_charge === true}
+                      onChange={(checked) => {
+                        handleApartmentFieldChange(item.id, 'settle_cleaning_charge', checked);
+                        persistApartmentField(item.id, 'settle_cleaning_charge', checked);
+                      }}
+                      className="flex items-center gap-1.5 text-xs text-gray-700"
+                    >
+                      Settle Cleaning &amp; Laundry
+                    </Switch>
                   </div>
                   <div>
                     <label className="text-xs text-gray-500">Commission %</label>

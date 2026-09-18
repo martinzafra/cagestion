@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS inventory_apartments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT UNIQUE NOT NULL, -- 'Barbarita', 'TMB', 'Catamaran', 'Casa Artur', 'Alexandrite'
   owner_name TEXT, -- shown on the printed Booking Settlement statement
+  settle_cleaning_charge BOOLEAN NOT NULL DEFAULT false, -- pass the cleaning charge/cost through on the statement instead of absorbing it as CA margin
   commission_percentage DECIMAL(5, 2) DEFAULT 0,
   contract apartment_contract_type NOT NULL DEFAULT 'None',
   contract_date DATE,
