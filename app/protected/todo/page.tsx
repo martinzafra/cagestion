@@ -113,7 +113,7 @@ export default function TodoPage() {
   const [userRole, setUserRole] = useState('');
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [apartments, setApartments] = useState<any[]>([]);
-  // Booking IDs with at least one Revenue entry - CA Inv and Liquidation
+  // Booking IDs with at least one Revenue entry - CA Inv/Coll & Settlement
   // can't be marked Sent without one to invoice against.
   const [revenueBookingIds, setRevenueBookingIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -242,8 +242,8 @@ export default function TodoPage() {
       { header: 'Police Registration', value: (b) => b.police_registration },
       { header: 'Police Registration Photo', value: (b) => (b.police_registration_file ? 'Yes' : 'No') },
       { header: 'Owner Invoice', value: (b) => b.platform_invoice },
-      { header: 'CA Inv and Liquidation', value: (b) => b.final_liquidation },
-      { header: 'CA Inv and Liquidation Date', value: (b) => b.final_liquidation_date },
+      { header: 'CA Inv/Coll & Settlement', value: (b) => b.final_liquidation },
+      { header: 'CA Inv/Coll & Settlement Date', value: (b) => b.final_liquidation_date },
       { header: 'Exp Done', value: (b) => (b.inv_exp_done ? 'Yes' : 'No') },
     ]);
   };
@@ -333,7 +333,7 @@ export default function TodoPage() {
     value: string
   ) => {
     if (field === 'final_liquidation' && value === 'SENT' && !revenueBookingIds.has(booking.id)) {
-      toast.error('Assign Revenue to this booking before marking CA Inv and Liquidation as Sent');
+      toast.error('Assign Revenue to this booking before marking CA Inv/Coll & Settlement as Sent');
       // Sent is unreachable without Revenue, so skip past it (NA -> Sent
       // would otherwise land back on NA every click, with no way through
       // to complete the cycle) straight to To Be Done instead of no-op'ing.
@@ -577,7 +577,7 @@ export default function TodoPage() {
             }
             className="select"
           >
-            <option value="">CA Inv and Liquidation: All</option>
+            <option value="">CA Inv/Coll & Settlement: All</option>
             <option value="TO BE DONE">To Be Done</option>
             <option value="SENT">Sent</option>
             <option value="NA">N/A</option>
@@ -624,7 +624,7 @@ export default function TodoPage() {
                 <SortableHeader column="guest_instructions" align="center">Guest Instructions</SortableHeader>
                 <SortableHeader column="police_registration" align="center">Police Registration</SortableHeader>
                 <SortableHeader column="platform_invoice" align="center">Owner Invoice</SortableHeader>
-                <SortableHeader column="final_liquidation" align="center">CA Inv and Liquidation</SortableHeader>
+                <SortableHeader column="final_liquidation" align="center">CA Inv/Coll & Settlement</SortableHeader>
                 <th className="!text-center">Expenses</th>
               </tr>
             </thead>
@@ -964,7 +964,7 @@ export default function TodoPage() {
                           : undefined
                       }
                     >
-                      <span className="text-sm">CA Inv and Liquidation</span>
+                      <span className="text-sm">CA Inv/Coll & Settlement</span>
                       <div className="flex items-center gap-1.5">
                         {b.final_liquidation_file ? (
                           <button

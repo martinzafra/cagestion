@@ -105,7 +105,7 @@ function SettlementsPageInner() {
     if (records.some((r) => r.id === wanted)) {
       setSelectedId(wanted);
     } else {
-      toast.error("That booking isn't ready for a settlement — it needs to be Confirmed (not Pending/Cancelled) and CA Inv and Liquidation can't be N/A.");
+      toast.error("That booking isn't ready for a settlement — it needs to be Confirmed (not Pending/Cancelled) and CA Inv/Coll & Settlement can't be N/A.");
     }
   }, [loading, records, searchParams]);
 
@@ -424,8 +424,8 @@ function SettlementsPageInner() {
         </div>
       ) : records.length === 0 ? (
         <div className="card text-center py-12 text-gray-500">
-          Nothing here yet. A booking shows up once it's Confirmed or later, and CA Inv and
-          Liquidation isn't set to N/A.
+          Nothing here yet. A booking shows up once it's Confirmed or later, and CA Inv/Coll
+          & Settlement isn't set to N/A.
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,380px),1fr] gap-6 items-start print:block">
