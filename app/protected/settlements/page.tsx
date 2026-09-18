@@ -34,10 +34,13 @@ interface SettlementRecord {
   cleaningCharge: number;
   otherCharge: number;
   rent: number;
-  platformFee: number;
-  caFee: number;
-  caVat: number;
-  toOwner: number;
+  // null when there's no Commission entry in Revenue & Invoicing yet - the
+  // booking is on the radar (confirmed or later) but not settle-able.
+  platformFee: number | null;
+  caFee: number | null;
+  caVat: number | null;
+  toOwner: number | null;
+  hasRevenue: boolean;
   status: 'pending' | 'sent';
   issuedDate: string;
   fileUrl: string | null;
@@ -73,7 +76,7 @@ function SettlementsPageInner() {
   const [records, setRecords] = useState<SettlementRecord[]>([]);
   const [apartments, setApartments] = useState<{ id: string; name: string }[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'sent'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'sent'>('pending');
   const [apartmentFilter, setApartmentFilter] = useState('all');
   const [settlementDateInput, setSettlementDateInput] = useState('');
   const [archiving, setArchiving] = useState(false);
@@ -93,18 +96,26 @@ function SettlementsPageInner() {
   // right after the first successful load - a later refetch (e.g. after
   // archiving) must never yank the selection back to that booking.
   useEffect(() => {
-    if (loading || appliedDeepLinkRef.current) return;
-    appliedDeepLinkRef.current = true;
+    if (loading || records.length === 0 || appliedDeepLinkRef.current) return;
     const wanted = searchParams.get('booking');
-    if (wanted) {
-      if (records.some((r) => r.id === wanted)) {
-        setSelectedId(wanted);
-        return;
-      }
-      toast.error("That booking doesn't have Revenue (Commission) assigned yet — add it in Revenue & Invoicing first.");
+    if (!wanted) return;
+    appliedDeepLinkRef.current = true;
+    if (records.some((r) => r.id === wanted)) {
+      setSelectedId(wanted);
+    } else {
+      toast.error("That booking isn't ready for a settlement — it needs to be Confirmed (not Pending/Cancelled) and CA Inv and Liquidation can't be N/A.");
     }
-    if (!wanted && records.length > 0) setSelectedId(records[0].id);
   }, [loading, records, searchParams]);
+
+  // Default selection once records are in: prefer the first Pending one so
+  // it matches the queue's default filter. Re-evaluates against whatever
+  // records currently holds (instead of a one-shot ref) so it can't lock
+  // onto a stale answer if the fetch effect runs more than once in dev.
+  useEffect(() => {
+    if (loading || records.length === 0 || selectedId !== null) return;
+    const firstPending = records.find((r) => r.status === 'pending');
+    setSelectedId((firstPending || records[0]).id);
+  }, [loading, records, selectedId]);
 
   const selected = records.find((r) => r.id === selectedId) || null;
 
@@ -152,6 +163,7 @@ function SettlementsPageInner() {
              platform:inventory_platforms(name)`
           )
           .neq('final_liquidation', 'NA')
+          .in('status', ['CONFIRMED', 'DONE', 'FINISHED'])
           .order('check_in_date', { ascending: false }),
         supabase
           .from('revenue_invoicing')
@@ -185,16 +197,15 @@ function SettlementsPageInner() {
       const nextRecords: SettlementRecord[] = [];
       (bookingsRes.data || []).forEach((b: any) => {
         const commission = commissionByBooking.get(b.id);
-        if (!commission) return; // no Commission revenue assigned yet - not settle-able
 
         const pricePerNight = calculateDailyPricePerNight(b.daily_price || 0, b.price_basis || 'DAY');
         const rent = b.total_rent ?? round2(pricePerNight * (b.nights || 0));
         const cleaningCharge = b.cleaning_charge || 0;
         const otherCharge = b.other_charge || 0;
-        const platformFee = platformFeeByBooking.get(b.id) || 0;
-        const toOwner = round2(
-          rent + cleaningCharge + otherCharge - platformFee - commission.fee - commission.vat
-        );
+        const platformFee = commission ? platformFeeByBooking.get(b.id) || 0 : null;
+        const toOwner = commission
+          ? round2(rent + cleaningCharge + otherCharge - (platformFee || 0) - commission.fee - commission.vat)
+          : null;
 
         nextRecords.push({
           id: b.id,
@@ -212,9 +223,10 @@ function SettlementsPageInner() {
           otherCharge,
           rent,
           platformFee,
-          caFee: commission.fee,
-          caVat: commission.vat,
+          caFee: commission ? commission.fee : null,
+          caVat: commission ? commission.vat : null,
           toOwner,
+          hasRevenue: !!commission,
           status: b.final_liquidation === 'SENT' ? 'sent' : 'pending',
           issuedDate: b.final_liquidation_date || todayISO(),
           fileUrl: b.final_liquidation_file,
@@ -237,8 +249,9 @@ function SettlementsPageInner() {
   });
   const pending = records.filter((r) => r.status === 'pending');
   const sent = records.filter((r) => r.status === 'sent');
-  const pendingTotal = pending.reduce((sum, r) => sum + r.toOwner, 0);
-  const sentTotal = sent.reduce((sum, r) => sum + r.toOwner, 0);
+  const pendingTotal = pending.reduce((sum, r) => sum + (r.toOwner || 0), 0);
+  const sentTotal = sent.reduce((sum, r) => sum + (r.toOwner || 0), 0);
+  const pendingMissingRevenue = pending.filter((r) => !r.hasRevenue).length;
   const apartmentsInQueue = Array.from(new Set(records.map((r) => r.apartmentName))).sort();
 
   const handleViewFile = async (path: string) => {
@@ -256,7 +269,8 @@ function SettlementsPageInner() {
   const handlePrint = () => window.print();
 
   const handleArchive = async () => {
-    if (!selected || selected.status === 'sent' || !paperRef.current || !settlementDateInput) return;
+    if (!selected || selected.status === 'sent' || !selected.hasRevenue || !paperRef.current || !settlementDateInput)
+      return;
     setArchiving(true);
     try {
       const canvas = await html2canvas(paperRef.current, { scale: 2, backgroundColor: '#ffffff' });
@@ -340,7 +354,11 @@ function SettlementsPageInner() {
         <StatCard
           label="Pending settlement"
           value={`${pending.length} · ${formatCurrency(pendingTotal)}`}
-          sub="Ready to preview and send"
+          sub={
+            pendingMissingRevenue > 0
+              ? `${pendingMissingRevenue} still need Revenue assigned`
+              : 'Ready to preview and send'
+          }
           tone="pending"
         />
         <StatCard
@@ -363,8 +381,8 @@ function SettlementsPageInner() {
         </div>
       ) : records.length === 0 ? (
         <div className="card text-center py-12 text-gray-500">
-          No bookings are ready to settle yet. A booking shows up here once it has a Commission
-          entry in Revenue &amp; Invoicing.
+          Nothing here yet. A booking shows up once it's Confirmed or later, and CA Inv and
+          Liquidation isn't set to N/A.
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,380px),1fr] gap-6 items-start print:block">
@@ -449,8 +467,12 @@ function SettlementsPageInner() {
                                 </span>
                                 <span className="font-semibold text-sm truncate">{r.apartmentName}</span>
                               </div>
-                              <span className="font-bold text-sm tabular-nums shrink-0">
-                                {formatCurrency(r.toOwner)}
+                              <span
+                                className={`font-bold text-sm tabular-nums shrink-0 ${
+                                  r.hasRevenue ? '' : 'text-amber-600 font-medium normal-case'
+                                }`}
+                              >
+                                {r.hasRevenue ? formatCurrency(r.toOwner!) : 'Revenue pending'}
                               </span>
                             </div>
                             <div className="text-xs text-gray-500 mt-1">
@@ -506,7 +528,13 @@ function SettlementsPageInner() {
                   />
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <button type="button" onClick={handlePrint} className="btn-secondary flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handlePrint}
+                    disabled={!selected.hasRevenue}
+                    title={selected.hasRevenue ? undefined : 'Add a Commission entry in Revenue & Invoicing first'}
+                    className="btn-secondary flex items-center gap-2 disabled:opacity-60"
+                  >
                     <Printer size={16} />
                     Print / Save as PDF
                   </button>
@@ -531,7 +559,8 @@ function SettlementsPageInner() {
                     <button
                       type="button"
                       onClick={handleArchive}
-                      disabled={archiving}
+                      disabled={archiving || !selected.hasRevenue}
+                      title={selected.hasRevenue ? undefined : 'Add a Commission entry in Revenue & Invoicing first'}
                       className="btn-primary flex items-center gap-2 disabled:opacity-60"
                     >
                       <Check size={16} />

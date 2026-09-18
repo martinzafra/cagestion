@@ -27,6 +27,9 @@ yarn-error.log*
 .env.*.local
 .env
 
+# database backups (contain guest PII - never commit)
+/backups
+
 # vercel
 .vercel
 
