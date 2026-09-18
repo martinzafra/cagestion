@@ -4,7 +4,7 @@ import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
-import { Printer, Check, Paperclip } from 'lucide-react';
+import { Printer, Check, Paperclip, Upload, X } from 'lucide-react';
 import {
   calculateDailyPricePerNight,
   formatCurrency,
@@ -80,7 +80,9 @@ function SettlementsPageInner() {
   const [apartmentFilter, setApartmentFilter] = useState('all');
   const [settlementDateInput, setSettlementDateInput] = useState('');
   const [archiving, setArchiving] = useState(false);
+  const [attaching, setAttaching] = useState(false);
   const paperRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const appliedDeepLinkRef = useRef(false);
 
   useEffect(() => {
@@ -249,8 +251,6 @@ function SettlementsPageInner() {
   });
   const pending = records.filter((r) => r.status === 'pending');
   const sent = records.filter((r) => r.status === 'sent');
-  const pendingTotal = pending.reduce((sum, r) => sum + (r.toOwner || 0), 0);
-  const sentTotal = sent.reduce((sum, r) => sum + (r.toOwner || 0), 0);
   const pendingMissingRevenue = pending.filter((r) => !r.hasRevenue).length;
   const apartmentsInQueue = Array.from(new Set(records.map((r) => r.apartmentName))).sort();
 
@@ -267,6 +267,27 @@ function SettlementsPageInner() {
   };
 
   const handlePrint = () => window.print();
+
+  // Shared by both the auto-generated PDF (Archive button) and a manually
+  // attached one (Attach PDF): once the file is uploaded to `path`, marking
+  // the booking Sent and reflecting it locally is identical either way.
+  const finalizeSettlement = async (record: SettlementRecord, path: string) => {
+    const updates: Record<string, any> = {
+      final_liquidation: 'SENT',
+      final_liquidation_date: settlementDateInput,
+      final_liquidation_file: path,
+    };
+    if (record.bookingStatus !== 'CANCELLED') {
+      updates.status = todayISO() > record.checkOutDate ? 'FINISHED' : 'DONE';
+    }
+    const { error } = await supabase.from('bookings').update(updates).eq('id', record.id);
+    if (error) throw error;
+    setRecords((prev) =>
+      prev.map((r) =>
+        r.id === record.id ? { ...r, status: 'sent', issuedDate: settlementDateInput, fileUrl: path } : r
+      )
+    );
+  };
 
   const handleArchive = async () => {
     if (!selected || selected.status === 'sent' || !selected.hasRevenue || !paperRef.current || !settlementDateInput)
@@ -287,32 +308,55 @@ function SettlementsPageInner() {
         .upload(path, blob, { upsert: true, contentType: 'application/pdf' });
       if (uploadError) throw uploadError;
 
-      const updates: Record<string, any> = {
-        final_liquidation: 'SENT',
-        final_liquidation_date: settlementDateInput,
-        final_liquidation_file: path,
-      };
-      if (selected.bookingStatus !== 'CANCELLED') {
-        updates.status = todayISO() > selected.checkOutDate ? 'FINISHED' : 'DONE';
-      }
-      const { error: updateError } = await supabase
-        .from('bookings')
-        .update(updates)
-        .eq('id', selected.id);
-      if (updateError) throw updateError;
-
-      setRecords((prev) =>
-        prev.map((r) =>
-          r.id === selected.id
-            ? { ...r, status: 'sent', issuedDate: settlementDateInput, fileUrl: path }
-            : r
-        )
-      );
+      await finalizeSettlement(selected, path);
       toast.success('Settlement archived and booking marked as Sent');
     } catch (error: any) {
       toast.error(error.message || 'Failed to archive settlement');
     } finally {
       setArchiving(false);
+    }
+  };
+
+  const handleAttachFile = async (file?: File) => {
+    if (!file || !selected || !settlementDateInput) return;
+    setAttaching(true);
+    try {
+      const path = `${selected.id}/${Date.now()}.pdf`;
+      const { error: uploadError } = await supabase.storage
+        .from('settlement-attachments')
+        .upload(path, file, { upsert: true, contentType: 'application/pdf' });
+      if (uploadError) throw uploadError;
+
+      await finalizeSettlement(selected, path);
+      toast.success('Settlement PDF attached and booking marked as Sent');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to attach settlement PDF');
+    } finally {
+      setAttaching(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveFile = async () => {
+    if (!selected || !selected.fileUrl) return;
+    if (!confirm('Remove this settlement PDF? The booking will go back to Pending.')) return;
+    try {
+      await supabase.storage.from('settlement-attachments').remove([selected.fileUrl]);
+      const updates: Record<string, any> = {
+        final_liquidation: 'TO BE DONE',
+        final_liquidation_file: null,
+      };
+      if (selected.bookingStatus === 'FINISHED' || selected.bookingStatus === 'DONE') {
+        updates.status = 'CONFIRMED';
+      }
+      const { error } = await supabase.from('bookings').update(updates).eq('id', selected.id);
+      if (error) throw error;
+      setRecords((prev) =>
+        prev.map((r) => (r.id === selected.id ? { ...r, status: 'pending', fileUrl: null } : r))
+      );
+      toast.success('Settlement PDF removed');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to remove settlement PDF');
     }
   };
 
@@ -353,7 +397,7 @@ function SettlementsPageInner() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 print:hidden">
         <StatCard
           label="Pending settlement"
-          value={`${pending.length} · ${formatCurrency(pendingTotal)}`}
+          value={String(pending.length)}
           sub={
             pendingMissingRevenue > 0
               ? `${pendingMissingRevenue} still need Revenue assigned`
@@ -363,7 +407,7 @@ function SettlementsPageInner() {
         />
         <StatCard
           label="Sent"
-          value={`${sent.length} · ${formatCurrency(sentTotal)}`}
+          value={String(sent.length)}
           sub="Archived with a PDF on file"
           tone="sent"
         />
@@ -528,6 +572,13 @@ function SettlementsPageInner() {
                   />
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={(e) => handleAttachFile(e.target.files?.[0])}
+                  />
                   <button
                     type="button"
                     onClick={handlePrint}
@@ -538,6 +589,16 @@ function SettlementsPageInner() {
                     <Printer size={16} />
                     Print / Save as PDF
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={attaching}
+                    title="Attach a settlement PDF you already have, instead of generating one"
+                    className="btn-secondary flex items-center gap-2 disabled:opacity-60"
+                  >
+                    <Upload size={16} />
+                    {attaching ? 'Attaching…' : 'Attach PDF'}
+                  </button>
                   {selected.status === 'sent' ? (
                     <>
                       <button type="button" disabled className="btn-primary flex items-center gap-2 opacity-60">
@@ -545,14 +606,24 @@ function SettlementsPageInner() {
                         Archived ✓ · {formatDate(selected.issuedDate)}
                       </button>
                       {selected.fileUrl && (
-                        <button
-                          type="button"
-                          onClick={() => handleViewFile(selected.fileUrl!)}
-                          className="text-sm text-azure font-medium hover:underline flex items-center gap-1"
-                        >
-                          <Paperclip size={14} />
-                          View archived PDF
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleViewFile(selected.fileUrl!)}
+                            className="text-sm text-azure font-medium hover:underline flex items-center gap-1"
+                          >
+                            <Paperclip size={14} />
+                            View archived PDF
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleRemoveFile}
+                            title="Remove the attached PDF and reopen this settlement"
+                            className="p-1.5 hover:bg-red-50 rounded"
+                          >
+                            <X size={16} className="text-red-500" />
+                          </button>
+                        </>
                       )}
                     </>
                   ) : (
