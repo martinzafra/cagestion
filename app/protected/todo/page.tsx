@@ -857,13 +857,6 @@ export default function TodoPage() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Police Registration</span>
                       <div className="flex items-center gap-1.5">
-                        <StatusSquare
-                          value={b.police_registration}
-                          doneValue="DONE"
-                          onChange={(value) =>
-                            handleTaskStatusChange(b, 'police_registration', null, value)
-                          }
-                        />
                         <input
                           type="file"
                           accept="image/*"
@@ -904,6 +897,13 @@ export default function TodoPage() {
                             <Plus size={14} className="text-gray-500" />
                           </button>
                         )}
+                        <StatusSquare
+                          value={b.police_registration}
+                          doneValue="DONE"
+                          onChange={(value) =>
+                            handleTaskStatusChange(b, 'police_registration', null, value)
+                          }
+                        />
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
