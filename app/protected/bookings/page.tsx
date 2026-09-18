@@ -259,7 +259,7 @@ export default function BookingsPage() {
         <>
           {/* Filter line */}
           <div className="card">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-start">
               <select
                 value={listFilters.apartment_id}
                 onChange={(e) =>
@@ -288,24 +288,30 @@ export default function BookingsPage() {
                 <option value="FINISHED">Finished</option>
                 <option value="CANCELLED">Cancelled</option>
               </select>
-              <input
-                type="date"
-                title="Check-in from"
-                value={listFilters.dateFrom}
-                onChange={(e) =>
-                  setListFilters({ ...listFilters, dateFrom: e.target.value })
-                }
-                className="input"
-              />
-              <input
-                type="date"
-                title="Check-in to"
-                value={listFilters.dateTo}
-                onChange={(e) =>
-                  setListFilters({ ...listFilters, dateTo: e.target.value })
-                }
-                className="input"
-              />
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">dd/mm/yyyy</label>
+                <input
+                  type="date"
+                  title="Check-in from"
+                  value={listFilters.dateFrom}
+                  onChange={(e) =>
+                    setListFilters({ ...listFilters, dateFrom: e.target.value })
+                  }
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">dd/mm/yyyy</label>
+                <input
+                  type="date"
+                  title="Check-in to"
+                  value={listFilters.dateTo}
+                  onChange={(e) =>
+                    setListFilters({ ...listFilters, dateTo: e.target.value })
+                  }
+                  className="input"
+                />
+              </div>
               <input
                 type="text"
                 placeholder="Search guest or reference..."

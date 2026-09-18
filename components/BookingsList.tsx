@@ -315,10 +315,6 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
                     <div className="text-xs text-gray-500">Check-out</div>
                     <div className="font-medium">{formatDate(booking.check_out_date)}</div>
                   </div>
-                  <div className="col-span-full">
-                    <div className="text-xs text-gray-500">Owner Invoice</div>
-                    <div className="font-medium">{booking.platform_invoice}</div>
-                  </div>
                 </div>
 
                 {isExpanded && (
@@ -346,6 +342,7 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
                   </div>
                 )}
 
+                {isExpanded && (
                 <div
                   className="flex justify-end gap-1 mt-3 pt-3 border-t border-gray-100"
                   onClick={(e) => e.stopPropagation()}
@@ -365,6 +362,7 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
                     <Trash2 size={18} className="text-red-600" />
                   </button>
                 </div>
+                )}
               </div>
             );
           })

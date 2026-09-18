@@ -736,7 +736,7 @@ export default function RevenuePage() {
                 colorMap={apartmentColorMap}
               />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 items-start">
               <select
                 value={listFilters.revenue_type}
                 onChange={(e) =>
@@ -757,22 +757,28 @@ export default function RevenuePage() {
                 <option value="issued">Issued</option>
                 <option value="draft">Draft</option>
               </select>
-              <input
-                type="date"
-                title="Date from"
-                value={listFilters.dateFrom}
-                onChange={(e) =>
-                  setListFilters({ ...listFilters, dateFrom: e.target.value })
-                }
-                className="input"
-              />
-              <input
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">dd/mm/yyyy</label>
+                <input
+                  type="date"
+                  title="Date from"
+                  value={listFilters.dateFrom}
+                  onChange={(e) =>
+                    setListFilters({ ...listFilters, dateFrom: e.target.value })
+                  }
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">dd/mm/yyyy</label>
+                <input
                 type="date"
                 title="Date to"
                 value={listFilters.dateTo}
                 onChange={(e) => setListFilters({ ...listFilters, dateTo: e.target.value })}
                 className="input"
-              />
+                />
+              </div>
               <input
                 type="text"
                 placeholder="Search guest or invoice #..."
