@@ -364,7 +364,6 @@ function SettlementsPageInner() {
     ? {
         apartmentName: selected.apartmentName,
         ownerName: selected.ownerName,
-        guestName: selected.guestName,
         bookingRef: selected.bookingRef,
         platformName: selected.platformName,
         checkInDate: selected.checkInDate,

@@ -6,7 +6,6 @@ import { formatCurrencyPaper } from '@/lib/calculations';
 export interface SettlementData {
   apartmentName: string;
   ownerName: string | null;
-  guestName: string;
   bookingRef: string;
   platformName: string;
   checkInDate: string; // ISO yyyy-mm-dd
@@ -135,7 +134,6 @@ const SettlementPaper = React.forwardRef<HTMLDivElement, { data: SettlementData 
               <span className="italic text-gray text-sm font-medium">Owner:</span>
               <span className="text-base font-semibold">{data.ownerName || '—'}</span>
             </div>
-            <div className="text-[15px] text-gray italic mt-1">{data.guestName}</div>
           </div>
 
           <dl className="grid grid-cols-[7rem,1fr] sm:grid-cols-[11rem,1fr] gap-y-2.5 gap-x-4 mb-6 text-[15px]">
