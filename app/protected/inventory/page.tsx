@@ -492,12 +492,8 @@ export default function InventoryPage() {
                 )}
               </div>
               {activeTab === 'apartments' && (
-                <div
-                  className={`mt-3 pt-3 border-t grid grid-cols-1 gap-2 ${
-                    item.active === false ? 'sm:grid-cols-6' : 'sm:grid-cols-5'
-                  }`}
-                >
-                  <div>
+                <div className="mt-3 pt-3 border-t grid grid-cols-2 gap-x-3 gap-y-2">
+                  <div className="col-span-2">
                     <label className="text-xs text-gray-500">Owner</label>
                     <input
                       type="text"
@@ -511,18 +507,6 @@ export default function InventoryPage() {
                       }
                       className="input text-base sm:text-sm"
                     />
-                  </div>
-                  <div className="flex items-end pb-2.5">
-                    <Switch
-                      checked={item.settle_cleaning_charge === true}
-                      onChange={(checked) => {
-                        handleApartmentFieldChange(item.id, 'settle_cleaning_charge', checked);
-                        persistApartmentField(item.id, 'settle_cleaning_charge', checked);
-                      }}
-                      className="flex items-center gap-1.5 text-xs text-gray-700"
-                    >
-                      Settle Cleaning &amp; Laundry
-                    </Switch>
                   </div>
                   <div>
                     <label className="text-xs text-gray-500">Commission %</label>
@@ -548,6 +532,18 @@ export default function InventoryPage() {
                       onFocus={(e) => e.target.select()}
                       className="input text-base sm:text-sm"
                     />
+                  </div>
+                  <div className="flex items-end pb-2.5">
+                    <Switch
+                      checked={item.settle_cleaning_charge === true}
+                      onChange={(checked) => {
+                        handleApartmentFieldChange(item.id, 'settle_cleaning_charge', checked);
+                        persistApartmentField(item.id, 'settle_cleaning_charge', checked);
+                      }}
+                      className="flex items-center gap-1.5 text-xs text-gray-700"
+                    >
+                      Settle Cleaning &amp; Laundry
+                    </Switch>
                   </div>
                   <div>
                     <label className="text-xs text-gray-500">Contract</label>
@@ -579,7 +575,7 @@ export default function InventoryPage() {
                     />
                   </div>
                   {item.active === false && (
-                    <div>
+                    <div className="col-span-2">
                       <label className="text-xs text-gray-500">End Date</label>
                       <input
                         type="date"

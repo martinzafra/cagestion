@@ -150,7 +150,7 @@ function SettlementsPageInner() {
           .order('check_in_date', { ascending: false }),
         supabase
           .from('revenue_invoicing')
-          .select('booking_id, amount, vat, item:inventory_invoice_items(name)'),
+          .select('booking_id, amount, vat, amount_with_vat, revenue_type, item:inventory_invoice_items(name)'),
         supabase
           .from('expenses')
           .select('booking_id, total, category:inventory_expense_types(name)'),
@@ -160,29 +160,33 @@ function SettlementsPageInner() {
       if (expensesRes.error) throw expensesRes.error;
 
       const commissionByBooking = new Map<string, { fee: number; vat: number }>();
+      // The Cleaning & Laundry amount to deduct comes from its own Collection
+      // entry in Revenue & Invoicing (what was actually collected for it),
+      // not from what Casa Amiga separately paid a cleaner - those two
+      // figures are tracked independently and don't have to match.
+      const cleaningLaundryByBooking = new Map<string, number>();
       (revenueRes.data || []).forEach((r: any) => {
-        if (!r.booking_id || r.item?.name !== 'Commission') return;
-        const entry = commissionByBooking.get(r.booking_id) || { fee: 0, vat: 0 };
-        entry.fee += r.amount || 0;
-        entry.vat += r.vat || 0;
-        commissionByBooking.set(r.booking_id, entry);
+        if (!r.booking_id) return;
+        if (r.item?.name === 'Commission') {
+          const entry = commissionByBooking.get(r.booking_id) || { fee: 0, vat: 0 };
+          entry.fee += r.amount || 0;
+          entry.vat += r.vat || 0;
+          commissionByBooking.set(r.booking_id, entry);
+        } else if (r.item?.name === 'Cleaning&Laundry' && r.revenue_type === 'COLLECTION') {
+          cleaningLaundryByBooking.set(
+            r.booking_id,
+            (cleaningLaundryByBooking.get(r.booking_id) || 0) + (r.amount_with_vat || 0)
+          );
+        }
       });
 
       const platformFeeByBooking = new Map<string, number>();
-      const cleaningLaundryByBooking = new Map<string, number>();
       (expensesRes.data || []).forEach((e: any) => {
-        if (!e.booking_id) return;
-        if (e.category?.name === 'Platform Invoice') {
-          platformFeeByBooking.set(
-            e.booking_id,
-            (platformFeeByBooking.get(e.booking_id) || 0) + (e.total || 0)
-          );
-        } else if (e.category?.name === 'Cleaning' || e.category?.name === 'Laundry') {
-          cleaningLaundryByBooking.set(
-            e.booking_id,
-            (cleaningLaundryByBooking.get(e.booking_id) || 0) + (e.total || 0)
-          );
-        }
+        if (!e.booking_id || e.category?.name !== 'Platform Invoice') return;
+        platformFeeByBooking.set(
+          e.booking_id,
+          (platformFeeByBooking.get(e.booking_id) || 0) + (e.total || 0)
+        );
       });
 
       const nextRecords: SettlementRecord[] = [];

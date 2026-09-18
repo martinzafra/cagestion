@@ -349,6 +349,15 @@ export default function RevenuePage() {
   const commissionAmount = round2(formData.total_services * (formData.commission_percentage / 100));
   const totalAmount = round2(commissionAmount + (formData.vat || 0));
 
+  // Commission needs the Total Services / Commission % split to compute its
+  // amount. Cleaning&Laundry and Other aren't a percentage of anything - the
+  // person just knows the subtotal, so let them type it directly instead
+  // (stored as total_services with commission_percentage pinned to 100, so
+  // the generated `amount` column comes out equal to what they typed).
+  const selectedInvoiceItemName = invoiceItems.find((i) => i.id === formData.invoice_item_id)?.name;
+  const isDirectSubtotalItem =
+    selectedInvoiceItemName === 'Cleaning&Laundry' || selectedInvoiceItemName === 'Other';
+
   // Suggested IVA (21%, Spain's general rate) on the subtotal - only
   // proposed for Invoice entries, a Collection has no VAT to declare.
   const proposeVat = (
@@ -542,9 +551,26 @@ export default function RevenuePage() {
                 <label className="label">Invoice Item *</label>
                 <select
                   value={formData.invoice_item_id}
-                  onChange={(e) =>
-                    setFormData({ ...formData, invoice_item_id: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const itemName = invoiceItems.find((i) => i.id === e.target.value)?.name;
+                    const goingDirect = itemName === 'Cleaning&Laundry' || itemName === 'Other';
+                    setFormData((prev) => {
+                      // Keep the displayed subtotal truthful the instant the
+                      // item type changes, before the person retypes anything:
+                      // pin 100% going into direct-entry mode, restore the
+                      // apartment's real commission % coming back out of it.
+                      const apt = apartments.find((a) => a.id === prev.apartment_id);
+                      const commission_percentage = goingDirect
+                        ? 100
+                        : apt?.commission_percentage ?? prev.commission_percentage;
+                      return {
+                        ...prev,
+                        invoice_item_id: e.target.value,
+                        commission_percentage,
+                        vat: proposeVat(prev.total_services, commission_percentage, prev.revenue_type),
+                      };
+                    });
+                  }}
                   className="select"
                   required
                 >
@@ -556,50 +582,75 @@ export default function RevenuePage() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="label">Total Services €</label>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  value={formData.total_services}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      total_services: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  onFocus={(e) => e.target.select()}
-                  className="input"
-                  step="0.01"
-                />
-              </div>
-              <div>
-                <label className="label">Commission %</label>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  value={formData.commission_percentage}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      commission_percentage: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  onFocus={(e) => e.target.select()}
-                  className="input"
-                  step="0.01"
-                />
-              </div>
-              <div>
-                <label className="label whitespace-nowrap">Subtotal € (calculated)</label>
-                <input
-                  type="number"
-                  value={commissionAmount}
-                  disabled
-                  className="input bg-gray-100 font-semibold"
-                  step="0.01"
-                />
-              </div>
+              {isDirectSubtotalItem ? (
+                <div>
+                  <label className="label">Subtotal €</label>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={formData.total_services}
+                    onChange={(e) => {
+                      const total_services = parseFloat(e.target.value) || 0;
+                      setFormData((prev) => ({
+                        ...prev,
+                        total_services,
+                        commission_percentage: 100,
+                        vat: proposeVat(total_services, 100, prev.revenue_type),
+                      }));
+                    }}
+                    onFocus={(e) => e.target.select()}
+                    className="input"
+                    step="0.01"
+                  />
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="label">Total Services €</label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={formData.total_services}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          total_services: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      onFocus={(e) => e.target.select()}
+                      className="input"
+                      step="0.01"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Commission %</label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={formData.commission_percentage}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          commission_percentage: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      onFocus={(e) => e.target.select()}
+                      className="input"
+                      step="0.01"
+                    />
+                  </div>
+                  <div>
+                    <label className="label whitespace-nowrap">Subtotal € (calculated)</label>
+                    <input
+                      type="number"
+                      value={commissionAmount}
+                      disabled
+                      className="input bg-gray-100 font-semibold"
+                      step="0.01"
+                    />
+                  </div>
+                </>
+              )}
               <div>
                 <label className="label">VAT €</label>
                 <input
