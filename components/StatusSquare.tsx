@@ -9,11 +9,11 @@ interface StatusSquareProps {
   onChange: (next: string) => void;
 }
 
-// Tri-state toggle: click cycles TO BE DONE -> DONE/SENT -> NA -> ...
+// Tri-state toggle: click cycles TO BE DONE -> NA -> DONE/SENT -> ...
 export default function StatusSquare({ value, doneValue, onChange }: StatusSquareProps) {
   const cycle = () => {
     const next =
-      value === 'TO BE DONE' ? doneValue : value === doneValue ? 'NA' : 'TO BE DONE';
+      value === 'TO BE DONE' ? 'NA' : value === 'NA' ? doneValue : 'TO BE DONE';
     onChange(next);
   };
 
