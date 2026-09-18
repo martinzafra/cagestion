@@ -758,7 +758,6 @@ export default function RevenuePage() {
                 <option value="draft">Draft</option>
               </select>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">dd/mm/yyyy</label>
                 <input
                   type="date"
                   title="Date from"
@@ -770,7 +769,6 @@ export default function RevenuePage() {
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">dd/mm/yyyy</label>
                 <input
                 type="date"
                 title="Date to"

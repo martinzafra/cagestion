@@ -810,7 +810,6 @@ export default function ExpensesPage() {
                 ))}
               </select>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">dd/mm/yyyy</label>
                 <input
                   type="date"
                   title="Date from"
@@ -820,7 +819,6 @@ export default function ExpensesPage() {
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">dd/mm/yyyy</label>
                 <input
                   type="date"
                   title="Date to"

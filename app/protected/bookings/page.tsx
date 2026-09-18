@@ -289,7 +289,6 @@ export default function BookingsPage() {
                 <option value="CANCELLED">Cancelled</option>
               </select>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">dd/mm/yyyy</label>
                 <input
                   type="date"
                   title="Check-in from"
@@ -301,7 +300,6 @@ export default function BookingsPage() {
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">dd/mm/yyyy</label>
                 <input
                   type="date"
                   title="Check-in to"
