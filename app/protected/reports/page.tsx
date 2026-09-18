@@ -153,6 +153,31 @@ function getQuarterBounds(
   };
 }
 
+// Picks which quarter the Tax Report should default to. A quarter stays
+// the default for a full month after it ends (its VAT-filing grace
+// period), so e.g. Q1 (Jan-Mar) is shown from 1 Feb through 30 Apr - the
+// window is the quarter's own 3 months shifted one month later. Found by
+// taking, among all quarters that have already "started" showing (their
+// shifted window has begun), the one that started most recently - this
+// also gracefully covers the rare 1-day gap some month-length quirks
+// leave between two windows, by just extending the earlier quarter.
+function getDefaultTaxQuarter(today: Date): { period: 'Q1' | 'Q2' | 'Q3' | 'Q4'; year: number } {
+  const candidates: { year: number; quarter: 1 | 2 | 3 | 4; windowStart: Date }[] = [];
+  const y = today.getFullYear();
+  for (const year of [y - 1, y, y + 1]) {
+    for (const quarter of [1, 2, 3, 4] as const) {
+      // Quarter Q starts at month (Q-1)*3 (0-indexed); the window starts
+      // one calendar month after that.
+      candidates.push({ year, quarter, windowStart: new Date(year, (quarter - 1) * 3 + 1, 1) });
+    }
+  }
+  const eligible = candidates
+    .filter((c) => c.windowStart <= today)
+    .sort((a, b) => b.windowStart.getTime() - a.windowStart.getTime());
+  const best = eligible[0] || candidates[0];
+  return { period: `Q${best.quarter}` as 'Q1' | 'Q2' | 'Q3' | 'Q4', year: best.year };
+}
+
 function ReportKpiCard({
   label,
   value,
@@ -222,8 +247,10 @@ export default function ReportsPage() {
   });
   const [taxReportRows, setTaxReportRows] = useState<TaxReportRow[]>([]);
   const [taxReportLoading, setTaxReportLoading] = useState(false);
-  const [taxPeriod, setTaxPeriod] = useState<'Q1' | 'Q2' | 'Q3' | 'Q4' | 'ANNUAL'>('ANNUAL');
-  const [taxYear, setTaxYear] = useState(new Date().getFullYear());
+  const [taxPeriod, setTaxPeriod] = useState<'Q1' | 'Q2' | 'Q3' | 'Q4' | 'ANNUAL'>(
+    () => getDefaultTaxQuarter(new Date()).period
+  );
+  const [taxYear, setTaxYear] = useState(() => getDefaultTaxQuarter(new Date()).year);
   const [taxYearOptions, setTaxYearOptions] = useState<number[]>([]);
   const [taxSortColumn, setTaxSortColumn] = useState<TaxSortColumn | null>(null);
   const [taxSortDirection, setTaxSortDirection] = useState<'asc' | 'desc'>('asc');
