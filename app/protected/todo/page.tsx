@@ -334,6 +334,10 @@ export default function TodoPage() {
   ) => {
     if (field === 'final_liquidation' && value === 'SENT' && !revenueBookingIds.has(booking.id)) {
       toast.error('Assign Revenue to this booking before marking CA Inv and Liquidation as Sent');
+      // Sent is unreachable without Revenue, so skip past it (NA -> Sent
+      // would otherwise land back on NA every click, with no way through
+      // to complete the cycle) straight to To Be Done instead of no-op'ing.
+      updateBooking(booking.id, { final_liquidation: 'TO BE DONE' });
       return;
     }
     const updates: Record<string, any> = { [field]: value };
