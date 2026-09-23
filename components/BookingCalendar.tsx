@@ -145,10 +145,8 @@ const BookingCalendar: React.FC<BookingCalendarProps> = ({
                 {date && (
                   <>
                     <div
-                      className={`font-semibold text-xs mb-1 ${
-                        isToday
-                          ? 'inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white'
-                          : 'text-gray-700'
+                      className={`font-semibold text-xs mb-1 w-5 h-5 flex items-center justify-center rounded-full ${
+                        isToday ? 'bg-blue-500 text-white' : 'text-gray-700'
                       }`}
                     >
                       {date.getDate()}
