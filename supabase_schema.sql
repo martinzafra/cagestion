@@ -40,8 +40,11 @@ CREATE TABLE IF NOT EXISTS inventory_apartments (
   contract_date DATE,
   active BOOLEAN NOT NULL DEFAULT true,
   end_date DATE,
+  public_calendar_token UUID NOT NULL DEFAULT gen_random_uuid(), -- shareable read-only calendar link
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_apartments_public_calendar_token
+  ON inventory_apartments(public_calendar_token);
 
 CREATE TABLE IF NOT EXISTS inventory_platforms (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -368,3 +371,32 @@ AS $$
   WHERE is_registered_user();
 $$;
 GRANT EXECUTE ON FUNCTION get_calendar_bookings() TO authenticated;
+
+-- Public, unauthenticated share link for a single apartment's calendar.
+-- Only busy date ranges are exposed (no guest name or other booking
+-- details), keyed by the apartment's public_calendar_token.
+CREATE OR REPLACE FUNCTION get_public_apartment(p_token UUID)
+RETURNS TABLE (id UUID, name TEXT)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT id, name FROM inventory_apartments WHERE public_calendar_token = p_token;
+$$;
+GRANT EXECUTE ON FUNCTION get_public_apartment(UUID) TO anon, authenticated;
+
+CREATE OR REPLACE FUNCTION get_public_calendar_bookings(p_token UUID)
+RETURNS TABLE (check_in_date DATE, check_out_date DATE, status TEXT)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT b.check_in_date, b.check_out_date, b.status::text
+  FROM bookings b
+  JOIN inventory_apartments a ON a.id = b.apartment_id
+  WHERE a.public_calendar_token = p_token
+    AND b.status != 'CANCELLED';
+$$;
+GRANT EXECUTE ON FUNCTION get_public_calendar_bookings(UUID) TO anon, authenticated;

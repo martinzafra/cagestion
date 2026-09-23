@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, Lock, Pencil, Check, X } from 'lucide-react';
+import { Plus, Trash2, Lock, Pencil, Check, X, Copy, Link2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Switch from '@/components/Switch';
 import ToggleChip from '@/components/ToggleChip';
@@ -19,6 +19,7 @@ interface TabItem {
   contract_date?: string | null;
   active?: boolean;
   end_date?: string | null;
+  public_calendar_token?: string | null;
 }
 
 export default function InventoryPage() {
@@ -35,6 +36,20 @@ export default function InventoryPage() {
   const [showInactive, setShowInactive] = useState(false);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [agentUsers, setAgentUsers] = useState<Set<string>>(new Set());
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyPublicLink = async (item: TabItem) => {
+    if (!item.public_calendar_token) return;
+    const url = `${window.location.origin}/public/calendar/${item.public_calendar_token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(item.id);
+      toast.success('Link copied');
+      setTimeout(() => setCopiedId((prev) => (prev === item.id ? null : prev)), 2000);
+    } catch (error) {
+      toast.error('Failed to copy link');
+    }
+  };
 
   const tables: { [key in InventoryType]: string } = {
     agents: 'inventory_agents',
@@ -588,6 +603,34 @@ export default function InventoryPage() {
                         }
                         className="input text-base sm:text-sm"
                       />
+                    </div>
+                  )}
+                  {item.public_calendar_token && (
+                    <div className="col-span-2">
+                      <label className="text-xs text-gray-500 flex items-center gap-1">
+                        <Link2 size={12} /> Public calendar link
+                      </label>
+                      <div className="flex gap-2 mt-1">
+                        <input
+                          type="text"
+                          readOnly
+                          value={`${typeof window !== 'undefined' ? window.location.origin : ''}/public/calendar/${item.public_calendar_token}`}
+                          onFocus={(e) => e.target.select()}
+                          className="input text-xs sm:text-xs flex-1 text-gray-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleCopyPublicLink(item)}
+                          className="btn-secondary px-3"
+                          title="Copy link"
+                        >
+                          {copiedId === item.id ? (
+                            <Check size={16} className="text-green-600" />
+                          ) : (
+                            <Copy size={16} />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
