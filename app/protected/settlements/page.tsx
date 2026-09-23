@@ -4,7 +4,7 @@ import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
-import { Printer, Check, Paperclip, Upload, X } from 'lucide-react';
+import { Printer, Check, Paperclip, Upload, RotateCcw, Ban } from 'lucide-react';
 import {
   calculateDailyPricePerNight,
   formatCurrency,
@@ -44,7 +44,7 @@ interface SettlementRecord {
   cleaningLaundryDeduction: number;
   toOwner: number | null;
   hasRevenue: boolean;
-  status: 'pending' | 'sent';
+  status: 'pending' | 'sent' | 'na';
   issuedDate: string;
   fileUrl: string | null;
   bookingStatus: string;
@@ -57,7 +57,7 @@ function SettlementsPageInner() {
   const [records, setRecords] = useState<SettlementRecord[]>([]);
   const [apartments, setApartments] = useState<{ id: string; name: string }[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'sent'>('pending');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'sent' | 'na'>('pending');
   const [apartmentFilter, setApartmentFilter] = useState('all');
   const [settlementDateInput, setSettlementDateInput] = useState('');
   const [archiving, setArchiving] = useState(false);
@@ -86,7 +86,7 @@ function SettlementsPageInner() {
     if (records.some((r) => r.id === wanted)) {
       setSelectedId(wanted);
     } else {
-      toast.error("That booking isn't ready for a settlement — it needs to be Confirmed (not Pending/Cancelled) and CA Inv/Coll & Settlement can't be N/A.");
+      toast.error("That booking isn't ready for a settlement yet — it needs to be Confirmed (not Pending/Cancelled).");
     }
   }, [loading, records, searchParams]);
 
@@ -145,7 +145,6 @@ function SettlementsPageInner() {
              apartment_id, apartment:inventory_apartments(name, owner_name, settle_cleaning_charge),
              platform:inventory_platforms(name)`
           )
-          .neq('final_liquidation', 'NA')
           .in('status', ['CONFIRMED', 'DONE', 'FINISHED'])
           .order('check_in_date', { ascending: false }),
         supabase
@@ -239,7 +238,7 @@ function SettlementsPageInner() {
           cleaningLaundryDeduction,
           toOwner,
           hasRevenue: !!commission,
-          status: b.final_liquidation === 'SENT' ? 'sent' : 'pending',
+          status: b.final_liquidation === 'SENT' ? 'sent' : b.final_liquidation === 'NA' ? 'na' : 'pending',
           issuedDate: b.final_liquidation_date || todayISO(),
           fileUrl: b.final_liquidation_file,
           bookingStatus: b.status,
@@ -261,6 +260,7 @@ function SettlementsPageInner() {
   });
   const pending = records.filter((r) => r.status === 'pending');
   const sent = records.filter((r) => r.status === 'sent');
+  const na = records.filter((r) => r.status === 'na');
 
   const handleViewFile = async (path: string) => {
     try {
@@ -298,7 +298,7 @@ function SettlementsPageInner() {
   };
 
   const handleArchive = async () => {
-    if (!selected || selected.status === 'sent' || !selected.hasRevenue || !paperRef.current || !settlementDateInput)
+    if (!selected || selected.status !== 'pending' || !selected.hasRevenue || !paperRef.current || !settlementDateInput)
       return;
     setArchiving(true);
     try {
@@ -345,11 +345,21 @@ function SettlementsPageInner() {
     }
   };
 
-  const handleRemoveFile = async () => {
-    if (!selected || !selected.fileUrl) return;
-    if (!confirm('Remove this settlement PDF? The booking will go back to Pending.')) return;
+  // Undoes Archive: back to Pending so the date/PDF can be redone, e.g.
+  // after fixing a Revenue entry. Works even when there's no file to remove
+  // (a settlement can be Sent with nothing attached - see hasRevenue).
+  const handleRevertToDraft = async () => {
+    if (!selected || selected.status !== 'sent') return;
+    if (
+      !confirm(
+        'Revert this settlement to draft? Any archived PDF is removed and the booking goes back to Pending.'
+      )
+    )
+      return;
     try {
-      await supabase.storage.from('settlement-attachments').remove([selected.fileUrl]);
+      if (selected.fileUrl) {
+        await supabase.storage.from('settlement-attachments').remove([selected.fileUrl]);
+      }
       const updates: Record<string, any> = {
         final_liquidation: 'TO BE DONE',
         final_liquidation_file: null,
@@ -362,9 +372,42 @@ function SettlementsPageInner() {
       setRecords((prev) =>
         prev.map((r) => (r.id === selected.id ? { ...r, status: 'pending', fileUrl: null } : r))
       );
-      toast.success('Settlement PDF removed');
+      toast.success('Settlement reverted to draft');
     } catch (error: any) {
-      toast.error(error.message || 'Failed to remove settlement PDF');
+      toast.error(error.message || 'Failed to revert settlement');
+    }
+  };
+
+  // Marks a booking as not needing an owner settlement at all - mirrors the
+  // N/A state of the CA Inv/Coll & Settlement status square on To Do.
+  const handleMarkAsNA = async () => {
+    if (!selected || selected.status !== 'pending') return;
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ final_liquidation: 'NA' })
+        .eq('id', selected.id);
+      if (error) throw error;
+      setRecords((prev) => prev.map((r) => (r.id === selected.id ? { ...r, status: 'na' } : r)));
+      toast.success('Settlement marked as N/A');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update settlement');
+    }
+  };
+
+  // Undoes Mark as N/A: back to Pending.
+  const handleRevertNAToPending = async () => {
+    if (!selected || selected.status !== 'na') return;
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ final_liquidation: 'TO BE DONE' })
+        .eq('id', selected.id);
+      if (error) throw error;
+      setRecords((prev) => prev.map((r) => (r.id === selected.id ? { ...r, status: 'pending' } : r)));
+      toast.success('Settlement reverted to Pending');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to revert settlement');
     }
   };
 
@@ -409,8 +452,7 @@ function SettlementsPageInner() {
         </div>
       ) : records.length === 0 ? (
         <div className="card text-center py-12 text-gray-500">
-          Nothing here yet. A booking shows up once it's Confirmed or later, and CA Inv/Coll
-          & Settlement isn't set to N/A.
+          Nothing here yet. A booking shows up once it's Confirmed or later.
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,380px),1fr] gap-6 items-start print:block">
@@ -418,7 +460,7 @@ function SettlementsPageInner() {
             <h2 className="text-xl font-bold text-gray-900 mb-4">Queue</h2>
             <div className="flex flex-col gap-3 mb-4">
               <div className="flex flex-wrap gap-2">
-                {(['all', 'pending', 'sent'] as const).map((s) => (
+                {(['all', 'pending', 'sent', 'na'] as const).map((s) => (
                   <button
                     key={s}
                     type="button"
@@ -429,7 +471,13 @@ function SettlementsPageInner() {
                         : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
                     }`}
                   >
-                    {s === 'all' ? `All (${records.length})` : s === 'pending' ? `Pending (${pending.length})` : `Sent (${sent.length})`}
+                    {s === 'all'
+                      ? `All (${records.length})`
+                      : s === 'pending'
+                        ? `Pending (${pending.length})`
+                        : s === 'sent'
+                          ? `Sent (${sent.length})`
+                          : `N/A (${na.length})`}
                   </button>
                 ))}
               </div>
@@ -462,13 +510,13 @@ function SettlementsPageInner() {
                 </button>
               </div>
             ) : (
-              (['pending', 'sent'] as const).map((group) => {
+              (['pending', 'sent', 'na'] as const).map((group) => {
                 const items = visibleRecords.filter((r) => r.status === group);
                 if (items.length === 0) return null;
                 return (
                   <div key={group} className="mb-1">
                     <div className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mt-4 mb-2">
-                      {group === 'pending' ? 'Pending' : 'Sent'} — {items.length}
+                      {group === 'pending' ? 'Pending' : group === 'sent' ? 'Sent' : 'N/A'} — {items.length}
                     </div>
                     <div className="flex flex-col gap-2.5">
                       {items.map((r) => {
@@ -497,10 +545,14 @@ function SettlementsPageInner() {
                               </div>
                               <span
                                 className={`font-bold text-sm tabular-nums shrink-0 ${
-                                  r.hasRevenue ? '' : 'text-amber-600 font-medium normal-case'
+                                  r.status === 'na'
+                                    ? 'text-gray-400 font-medium normal-case'
+                                    : r.hasRevenue
+                                      ? ''
+                                      : 'text-amber-600 font-medium normal-case'
                                 }`}
                               >
-                                {r.hasRevenue ? formatCurrency(r.toOwner!) : 'Revenue pending'}
+                                {r.status === 'na' ? 'Not applicable' : r.hasRevenue ? formatCurrency(r.toOwner!) : 'Revenue pending'}
                               </span>
                             </div>
                             <div className="text-xs text-gray-500 mt-1">
@@ -514,10 +566,12 @@ function SettlementsPageInner() {
                                 className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
                                   r.status === 'sent'
                                     ? 'bg-green-100 text-green-800'
-                                    : 'bg-yellow-100 text-yellow-800'
+                                    : r.status === 'na'
+                                      ? 'bg-gray-100 text-gray-500'
+                                      : 'bg-yellow-100 text-yellow-800'
                                 }`}
                               >
-                                {r.status === 'sent' ? 'Sent' : 'Pending'}
+                                {r.status === 'sent' ? 'Sent' : r.status === 'na' ? 'N/A' : 'Pending'}
                               </span>
                             </div>
                           </button>
@@ -550,7 +604,7 @@ function SettlementsPageInner() {
                     id="settlement-date"
                     type="date"
                     value={settlementDateInput}
-                    disabled={selected.status === 'sent'}
+                    disabled={selected.status !== 'pending'}
                     onChange={(e) => setSettlementDateInput(e.target.value)}
                     className="input text-base sm:text-sm py-2 disabled:bg-gray-50 disabled:opacity-60"
                   />
@@ -563,26 +617,30 @@ function SettlementsPageInner() {
                     className="hidden"
                     onChange={(e) => handleAttachFile(e.target.files?.[0])}
                   />
-                  <button
-                    type="button"
-                    onClick={handlePrint}
-                    disabled={!selected.hasRevenue}
-                    title={selected.hasRevenue ? undefined : 'Add a Commission entry in Revenue & Invoicing first'}
-                    className="btn-secondary flex items-center gap-2 disabled:opacity-60"
-                  >
-                    <Printer size={16} />
-                    Print / Save as PDF
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={attaching}
-                    title="Attach a settlement PDF you already have, instead of generating one"
-                    className="btn-secondary flex items-center gap-2 disabled:opacity-60"
-                  >
-                    <Upload size={16} />
-                    {attaching ? 'Attaching…' : 'Attach PDF'}
-                  </button>
+                  {selected.status !== 'na' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handlePrint}
+                        disabled={!selected.hasRevenue}
+                        title={selected.hasRevenue ? undefined : 'Add a Commission entry in Revenue & Invoicing first'}
+                        className="btn-secondary flex items-center gap-2 disabled:opacity-60"
+                      >
+                        <Printer size={16} />
+                        Print / Save as PDF
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={attaching}
+                        title="Attach a settlement PDF you already have, instead of generating one"
+                        className="btn-secondary flex items-center gap-2 disabled:opacity-60"
+                      >
+                        <Upload size={16} />
+                        {attaching ? 'Attaching…' : 'Attach PDF'}
+                      </button>
+                    </>
+                  )}
                   {selected.status === 'sent' ? (
                     <>
                       <button type="button" disabled className="btn-primary flex items-center gap-2 opacity-60">
@@ -590,43 +648,75 @@ function SettlementsPageInner() {
                         Archived ✓ · {formatDate(selected.issuedDate)}
                       </button>
                       {selected.fileUrl && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => handleViewFile(selected.fileUrl!)}
-                            className="text-sm text-azure font-medium hover:underline flex items-center gap-1"
-                          >
-                            <Paperclip size={14} />
-                            View archived PDF
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleRemoveFile}
-                            title="Remove the attached PDF and reopen this settlement"
-                            className="p-1.5 hover:bg-red-50 rounded"
-                          >
-                            <X size={16} className="text-red-500" />
-                          </button>
-                        </>
+                        <button
+                          type="button"
+                          onClick={() => handleViewFile(selected.fileUrl!)}
+                          className="text-sm text-azure font-medium hover:underline flex items-center gap-1"
+                        >
+                          <Paperclip size={14} />
+                          View archived PDF
+                        </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={handleRevertToDraft}
+                        title="Undo Sent - back to Pending, so you can regenerate or edit it"
+                        className="btn-secondary flex items-center gap-2 text-red-600"
+                      >
+                        <RotateCcw size={16} />
+                        Revert to Draft
+                      </button>
+                    </>
+                  ) : selected.status === 'na' ? (
+                    <>
+                      <button type="button" disabled className="btn-secondary flex items-center gap-2 opacity-60">
+                        <Ban size={16} />
+                        Not applicable
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRevertNAToPending}
+                        title="This booking needs a settlement after all - back to Pending"
+                        className="btn-secondary flex items-center gap-2"
+                      >
+                        <RotateCcw size={16} />
+                        Revert to Pending
+                      </button>
                     </>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={handleArchive}
-                      disabled={archiving || !selected.hasRevenue}
-                      title={selected.hasRevenue ? undefined : 'Add a Commission entry in Revenue & Invoicing first'}
-                      className="btn-primary flex items-center gap-2 disabled:opacity-60"
-                    >
-                      <Check size={16} />
-                      {archiving ? 'Archiving…' : 'Archive & Mark as Sent'}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleArchive}
+                        disabled={archiving || !selected.hasRevenue}
+                        title={selected.hasRevenue ? undefined : 'Add a Commission entry in Revenue & Invoicing first'}
+                        className="btn-primary flex items-center gap-2 disabled:opacity-60"
+                      >
+                        <Check size={16} />
+                        {archiving ? 'Archiving…' : 'Archive & Mark as Sent'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleMarkAsNA}
+                        title="This booking doesn't need an owner settlement"
+                        className="btn-secondary flex items-center gap-2 text-gray-600"
+                      >
+                        <Ban size={16} />
+                        Mark as N/A
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
             )}
 
-            {paperData ? (
+            {selected?.status === 'na' ? (
+              <div className="card text-center py-12 text-gray-500 print:hidden">
+                <Ban size={28} className="mx-auto mb-3 text-gray-300" />
+                This booking is marked <span className="font-semibold text-gray-600">N/A</span> — no owner
+                settlement is needed.
+              </div>
+            ) : paperData ? (
               <SettlementPaper ref={paperRef} data={paperData} />
             ) : (
               <div className="card text-center py-12 text-gray-500 print:hidden">
