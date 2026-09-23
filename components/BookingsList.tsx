@@ -155,13 +155,7 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
             </tr>
           ) : (
             sortedBookings.map((booking) => (
-              <tr
-                key={booking.id}
-                className="cursor-pointer hover:bg-gray-50"
-                onClick={() =>
-                  setExpandedId(expandedId === booking.id ? null : booking.id)
-                }
-              >
+              <tr key={booking.id}>
                 <td>{booking.apartment?.name}</td>
                 <td>
                   <span
@@ -198,7 +192,7 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
                 <td className="text-center">
                   <StatusBadge status={booking.status} wrap />
                 </td>
-                <td onClick={(e) => e.stopPropagation()}>
+                <td>
                   <button
                     onClick={() => onEdit(booking.id)}
                     className="p-1 hover:bg-blue-100 rounded"
@@ -219,44 +213,6 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
           )}
         </tbody>
       </table>
-
-      {/* Expanded Details */}
-      {expandedId && (
-        <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
-          {bookings
-            .filter((b) => b.id === expandedId)
-            .map((booking) => (
-              <div key={booking.id} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-600">Phone</p>
-                  <p className="font-medium">{booking.guest_phone || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Email</p>
-                  <p className="font-medium">{booking.guest_email || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Platform</p>
-                  <p className="font-medium">{booking.platform?.name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Police Registration</p>
-                  <p className="font-medium">{booking.police_registration}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Owner Invoice</p>
-                  <p className="font-medium">{booking.platform_invoice}</p>
-                </div>
-                {booking.comments && (
-                  <div className="col-span-full">
-                    <p className="text-sm text-gray-600">Comments</p>
-                    <p className="font-medium">{booking.comments}</p>
-                  </div>
-                )}
-              </div>
-            ))}
-        </div>
-      )}
       </div>
 
       {/* Mobile cards */}
