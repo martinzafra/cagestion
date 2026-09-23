@@ -11,6 +11,7 @@ import { fetchCurrentUserRole } from '@/lib/userRole';
 import { compareSortValues } from '@/lib/sort';
 import { exportToExcel } from '@/lib/exportExcel';
 import ApartmentChipFilter from '@/components/ApartmentChipFilter';
+import MoneyInput from '@/components/MoneyInput';
 
 type SortColumn =
   | 'expense_type'
@@ -587,34 +588,19 @@ export default function ExpensesPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="label">Amount € *</label>
-                <input
-                  type="number"
-                  inputMode="decimal"
+                <MoneyInput
                   value={formData.amount}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      amount: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  onFocus={(e) => e.target.select()}
+                  onValueChange={(amount) => setFormData({ ...formData, amount })}
                   className="input"
-                  step="0.01"
                   required
                 />
               </div>
               <div>
                 <label className="label">VAT €</label>
-                <input
-                  type="number"
-                  inputMode="decimal"
+                <MoneyInput
                   value={formData.vat}
-                  onChange={(e) =>
-                    setFormData({ ...formData, vat: parseFloat(e.target.value) || 0 })
-                  }
-                  onFocus={(e) => e.target.select()}
+                  onValueChange={(vat) => setFormData({ ...formData, vat })}
                   className="input"
-                  step="0.01"
                 />
               </div>
               <div>
