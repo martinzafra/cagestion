@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { calculateNights, round2 } from '@/lib/calculations';
 import toast from 'react-hot-toast';
 import Switch from './Switch';
+import { Paperclip, X } from 'lucide-react';
 
 interface BookingFormProps {
   bookingId?: string;
@@ -109,6 +110,10 @@ const BookingForm: React.FC<BookingFormProps> = ({
   const [platforms, setPlatforms] = useState<any[]>([]);
   const [paymentTypes, setPaymentTypes] = useState<any[]>([]);
   const [nights, setNights] = useState(0);
+  // Attachments live outside formData so they never end up in the bookings
+  // insert/update payload by accident.
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [priceMode, setPriceMode] = useState<'daily' | 'total'>('daily');
 
   const [formData, setFormData] = useState<FormData>({
@@ -293,6 +298,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
           final_liquidation: data.final_liquidation,
           final_liquidation_date: data.final_liquidation_date,
         });
+        setAttachments(data.attachments || []);
         if (data.check_in_date && data.check_out_date) {
           const checkIn = new Date(data.check_in_date);
           const checkOut = new Date(data.check_out_date);
@@ -378,6 +384,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
       // Empty strings aren't valid for TIME/nullable columns - convert to null
       const payload = {
         ...formData,
+        attachments,
         check_in_time: formData.check_in_time || null,
         check_out_time: formData.check_out_time || null,
         platform_invoice_date: formData.platform_invoice_date || null,
@@ -386,6 +393,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
         payment_type_id: formData.payment_type_id || null,
       };
 
+      let savedId = bookingId;
       if (bookingId) {
         const { error } = await supabase
           .from('bookings')
@@ -395,10 +403,33 @@ const BookingForm: React.FC<BookingFormProps> = ({
         if (error) throw error;
         toast.success('Booking updated successfully');
       } else {
-        const { error } = await supabase.from('bookings').insert([payload]);
+        const { data, error } = await supabase
+          .from('bookings')
+          .insert([payload])
+          .select('id')
+          .single();
 
         if (error) throw error;
+        savedId = data.id;
         toast.success('Booking created successfully');
+      }
+
+      if (pendingFiles.length > 0 && savedId) {
+        const uploaded: string[] = [];
+        for (const file of pendingFiles) {
+          const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+          const path = `${savedId}/${Date.now()}-${safeName}`;
+          const { error: uploadError } = await supabase.storage
+            .from('booking-attachments')
+            .upload(path, file, { contentType: file.type || undefined });
+          if (uploadError) throw uploadError;
+          uploaded.push(path);
+        }
+        const { error: attachError } = await supabase
+          .from('bookings')
+          .update({ attachments: [...attachments, ...uploaded] })
+          .eq('id', savedId);
+        if (attachError) throw attachError;
       }
 
       onSuccess();
@@ -802,6 +833,71 @@ const BookingForm: React.FC<BookingFormProps> = ({
             rows={3}
           />
         </div>
+      </div>
+
+      {/* Attachments */}
+      <div>
+        <label className="label">Attachments</label>
+        <ul className="space-y-1 mb-2">
+          {attachments.map((path) => (
+            <li key={path} className="flex items-center gap-2 text-sm">
+              <Paperclip size={14} className="text-gray-500" />
+              <button
+                type="button"
+                className="text-blue-600 hover:underline truncate"
+                onClick={async () => {
+                  const { data, error } = await supabase.storage
+                    .from('booking-attachments')
+                    .createSignedUrl(path, 60);
+                  if (error || !data) return toast.error('Could not open file');
+                  window.open(data.signedUrl, '_blank');
+                }}
+              >
+                {path.split('/').pop()?.replace(/^\d+-/, '')}
+              </button>
+              <button
+                type="button"
+                title="Remove"
+                className="p-0.5 hover:bg-red-100 rounded"
+                onClick={async () => {
+                  if (!confirm('Remove this attachment?')) return;
+                  await supabase.storage.from('booking-attachments').remove([path]);
+                  const next = attachments.filter((a) => a !== path);
+                  setAttachments(next);
+                  if (bookingId) {
+                    await supabase.from('bookings').update({ attachments: next }).eq('id', bookingId);
+                  }
+                }}
+              >
+                <X size={14} className="text-red-600" />
+              </button>
+            </li>
+          ))}
+          {pendingFiles.map((file, i) => (
+            <li key={`${file.name}-${i}`} className="flex items-center gap-2 text-sm text-gray-500">
+              <Paperclip size={14} />
+              <span className="truncate">{file.name} (uploaded on save)</span>
+              <button
+                type="button"
+                title="Remove"
+                className="p-0.5 hover:bg-red-100 rounded"
+                onClick={() => setPendingFiles((prev) => prev.filter((_, j) => j !== i))}
+              >
+                <X size={14} className="text-red-600" />
+              </button>
+            </li>
+          ))}
+        </ul>
+        <input
+          type="file"
+          multiple
+          className="text-sm"
+          value=""
+          onChange={(e) => {
+            const files = Array.from(e.target.files || []);
+            if (files.length) setPendingFiles((prev) => [...prev, ...files]);
+          }}
+        />
       </div>
 
       {/* Buttons */}

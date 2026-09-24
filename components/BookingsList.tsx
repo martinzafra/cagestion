@@ -2,12 +2,13 @@
 
 import React, { useState } from 'react';
 import { formatDate } from '@/lib/calculations';
-import { Edit2, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
+import { Edit2, Trash2, Download, ChevronUp, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 import { compareSortValues } from '@/lib/sort';
 import StatusBadge from '@/components/StatusBadge';
 import { getPlatformBadge } from '@/lib/platformBadge';
+import { downloadBookingDocuments } from '@/lib/bookingDocuments';
 
 interface BookingsListProps {
   bookings: any[];
@@ -64,6 +65,20 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
       onRefresh();
     } catch (error: any) {
       toast.error(error.message);
+    }
+  };
+
+  const canDownloadDocs = (booking: any) =>
+    booking.status === 'FINISHED' || booking.status === 'CANCELLED';
+
+  const handleDownloadDocs = async (booking: any) => {
+    const toastId = toast.loading('Preparing documents...');
+    try {
+      const count = await downloadBookingDocuments(booking);
+      if (count === 0) toast('No documents found for this booking', { id: toastId });
+      else toast.success(`Downloaded ${count} document${count === 1 ? '' : 's'}`, { id: toastId });
+    } catch (error: any) {
+      toast.error(error.message || 'Download failed', { id: toastId });
     }
   };
 
@@ -207,6 +222,15 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
                   >
                     <Trash2 size={16} className="text-red-600" />
                   </button>
+                  {canDownloadDocs(booking) && (
+                    <button
+                      onClick={() => handleDownloadDocs(booking)}
+                      className="p-1 hover:bg-green-100 rounded ml-1"
+                      title="Download documents"
+                    >
+                      <Download size={16} className="text-green-600" />
+                    </button>
+                  )}
                 </td>
               </tr>
             ))
@@ -317,6 +341,15 @@ const BookingsList: React.FC<BookingsListProps> = ({ bookings, onRefresh, onEdit
                   >
                     <Trash2 size={18} className="text-red-600" />
                   </button>
+                  {canDownloadDocs(booking) && (
+                    <button
+                      onClick={() => handleDownloadDocs(booking)}
+                      className="p-1.5 hover:bg-green-100 rounded"
+                      title="Download documents"
+                    >
+                      <Download size={18} className="text-green-600" />
+                    </button>
+                  )}
                 </div>
                 )}
               </div>
