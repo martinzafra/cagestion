@@ -690,7 +690,7 @@ export default function TodoPage() {
                         />
                       </td>
                       <td>
-                        <div className="flex flex-wrap gap-1.5 items-center justify-center">
+                        <div className="flex flex-nowrap gap-1 items-center justify-center">
                           <input
                             type="file"
                             accept="image/*"
@@ -703,12 +703,12 @@ export default function TodoPage() {
                             }
                           />
                           {b.police_registration_file ? (
-                            <>
+                            <div className="flex flex-col items-center">
                               <button
                                 type="button"
                                 onClick={() => handleViewPoliceFile(b.police_registration_file!)}
                                 title="View attached photo"
-                                className="p-1 hover:bg-gray-200 rounded"
+                                className="p-0.5 hover:bg-gray-200 rounded"
                               >
                                 <ImageIcon size={14} className="text-gray-600" />
                               </button>
@@ -716,11 +716,11 @@ export default function TodoPage() {
                                 type="button"
                                 onClick={() => handleDeletePoliceFile(b)}
                                 title="Remove photo"
-                                className="p-1 hover:bg-red-100 rounded"
+                                className="p-0.5 hover:bg-red-100 rounded"
                               >
                                 <X size={14} className="text-red-500" />
                               </button>
-                            </>
+                            </div>
                           ) : (
                             <button
                               type="button"
