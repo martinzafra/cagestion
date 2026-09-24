@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
@@ -122,7 +122,6 @@ export default function TodoPage() {
   // that becomes complete while you work on it doesn't vanish from view
   // mid-edit - it only drops off after the next refresh.
   const [pendingSnapshotIds, setPendingSnapshotIds] = useState<Set<string>>(new Set());
-  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const [filters, setFilters] = useState({
     apartment_id: '',
@@ -379,17 +378,20 @@ export default function TodoPage() {
 
   const handlePoliceFileChange = async (booking: BookingRow, file?: File) => {
     if (!file) return;
+    const toastId = toast.loading('Uploading photo...');
     try {
-      const ext = file.name.split('.').pop();
+      // Phone camera captures can come without a usable extension in the name.
+      const nameExt = file.name.includes('.') ? file.name.split('.').pop() : '';
+      const ext = nameExt || file.type.split('/')[1] || 'jpg';
       const path = `${booking.id}/${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from('police-registrations')
-        .upload(path, file, { upsert: true });
+        .upload(path, file, { upsert: true, contentType: file.type || undefined });
       if (uploadError) throw uploadError;
       await updateBooking(booking.id, { police_registration_file: path });
-      toast.success('Photo attached');
+      toast.success('Photo attached', { id: toastId });
     } catch (error: any) {
-      toast.error(error.message || 'Failed to upload photo');
+      toast.error(error.message || 'Failed to upload photo', { id: toastId });
     }
   };
 
@@ -691,17 +693,6 @@ export default function TodoPage() {
                       </td>
                       <td>
                         <div className="flex flex-nowrap gap-1 items-center justify-center">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            ref={(el) => {
-                              fileInputRefs.current[b.id] = el;
-                            }}
-                            className="hidden"
-                            onChange={(e) =>
-                              handlePoliceFileChange(b, e.target.files?.[0] || undefined)
-                            }
-                          />
                           {b.police_registration_file ? (
                             <div className="flex flex-col items-center">
                               <button
@@ -722,14 +713,21 @@ export default function TodoPage() {
                               </button>
                             </div>
                           ) : (
-                            <button
-                              type="button"
-                              onClick={() => fileInputRefs.current[b.id]?.click()}
+                            <label
                               title="Attach photo"
-                              className="p-1 hover:bg-gray-200 rounded"
+                              className="p-1 hover:bg-gray-200 rounded cursor-pointer"
                             >
                               <Plus size={14} className="text-gray-500" />
-                            </button>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  handlePoliceFileChange(b, e.target.files?.[0] || undefined);
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
                           )}
                           <StatusSquare
                             value={b.police_registration}
@@ -897,17 +895,6 @@ export default function TodoPage() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Police Registration</span>
                       <div className="flex items-center gap-1.5">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          ref={(el) => {
-                            fileInputRefs.current[b.id] = el;
-                          }}
-                          className="hidden"
-                          onChange={(e) =>
-                            handlePoliceFileChange(b, e.target.files?.[0] || undefined)
-                          }
-                        />
                         {b.police_registration_file ? (
                           <>
                             <button
@@ -928,14 +915,21 @@ export default function TodoPage() {
                             </button>
                           </>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => fileInputRefs.current[b.id]?.click()}
+                          <label
                             title="Attach photo"
-                            className="p-1 hover:bg-gray-200 rounded"
+                            className="p-1 hover:bg-gray-200 rounded cursor-pointer"
                           >
                             <Plus size={14} className="text-gray-500" />
-                          </button>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                handlePoliceFileChange(b, e.target.files?.[0] || undefined);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
                         )}
                         <StatusSquare
                           value={b.police_registration}
