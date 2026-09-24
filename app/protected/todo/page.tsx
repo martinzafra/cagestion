@@ -127,10 +127,6 @@ export default function TodoPage() {
     apartment_id: '',
     search: '',
     todo_status: '',
-    guest_instructions: '',
-    police_registration: '',
-    platform_invoice: '',
-    final_liquidation: '',
   });
 
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
@@ -212,14 +208,6 @@ export default function TodoPage() {
       if (!matches) return false;
     }
     if (filters.todo_status && computeTodoStatus(b) !== filters.todo_status) return false;
-    if (filters.guest_instructions && b.guest_instructions !== filters.guest_instructions)
-      return false;
-    if (filters.police_registration && b.police_registration !== filters.police_registration)
-      return false;
-    if (filters.platform_invoice && b.platform_invoice !== filters.platform_invoice)
-      return false;
-    if (filters.final_liquidation && b.final_liquidation !== filters.final_liquidation)
-      return false;
     return true;
   });
 
@@ -537,52 +525,6 @@ export default function TodoPage() {
             <option value="CHECK OUT">Checked Out</option>
             <option value="TO INV/EXP">Input Exp.</option>
             <option value="COMPLETED">Completed</option>
-          </select>
-          <select
-            value={filters.guest_instructions}
-            onChange={(e) =>
-              setFilters({ ...filters, guest_instructions: e.target.value })
-            }
-            className="select"
-          >
-            <option value="">Guest Instructions: All</option>
-            <option value="TO BE DONE">To Be Done</option>
-            <option value="DONE">Done</option>
-            <option value="NA">N/A</option>
-          </select>
-          <select
-            value={filters.police_registration}
-            onChange={(e) =>
-              setFilters({ ...filters, police_registration: e.target.value })
-            }
-            className="select"
-          >
-            <option value="">Police Registration: All</option>
-            <option value="TO BE DONE">To Be Done</option>
-            <option value="DONE">Done</option>
-            <option value="NA">N/A</option>
-          </select>
-          <select
-            value={filters.platform_invoice}
-            onChange={(e) => setFilters({ ...filters, platform_invoice: e.target.value })}
-            className="select"
-          >
-            <option value="">Owner Invoice: All</option>
-            <option value="TO BE DONE">To Be Done</option>
-            <option value="SENT">Sent</option>
-            <option value="NA">N/A</option>
-          </select>
-          <select
-            value={filters.final_liquidation}
-            onChange={(e) =>
-              setFilters({ ...filters, final_liquidation: e.target.value })
-            }
-            className="select"
-          >
-            <option value="">CA Inv/Coll & Settlement: All</option>
-            <option value="TO BE DONE">To Be Done</option>
-            <option value="SENT">Sent</option>
-            <option value="NA">N/A</option>
           </select>
           <Switch
             checked={showCompleted}
