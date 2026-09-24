@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { calculateNights, round2 } from '@/lib/calculations';
 import toast from 'react-hot-toast';
 import Switch from './Switch';
-import { Paperclip, X } from 'lucide-react';
+import { Paperclip, Plus, X } from 'lucide-react';
 
 interface BookingFormProps {
   bookingId?: string;
@@ -114,6 +114,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
   // insert/update payload by accident.
   const [attachments, setAttachments] = useState<string[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [priceMode, setPriceMode] = useState<'daily' | 'total'>('daily');
 
   const [formData, setFormData] = useState<FormData>({
@@ -891,13 +892,23 @@ const BookingForm: React.FC<BookingFormProps> = ({
         <input
           type="file"
           multiple
-          className="text-sm"
-          value=""
+          accept="image/*,.pdf,.xls,.xlsx,.doc,.docx"
+          ref={fileInputRef}
+          className="hidden"
           onChange={(e) => {
             const files = Array.from(e.target.files || []);
             if (files.length) setPendingFiles((prev) => [...prev, ...files]);
+            e.target.value = '';
           }}
         />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="btn-secondary flex items-center gap-2 w-fit"
+        >
+          <Plus size={16} />
+          Attach File
+        </button>
       </div>
 
       {/* Buttons */}
