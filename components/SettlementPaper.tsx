@@ -104,14 +104,26 @@ const SettlementPaper = React.forwardRef<HTMLDivElement, { data: SettlementData 
             </div>
           </div>
 
-          <div className="hidden sm:grid grid-cols-3 items-center gap-3 h-16 px-8">
-            <div className="flex items-center gap-2 justify-self-start min-w-0">
-              <img src="/images/logo/CA-logo2.png" alt="Casa Amiga logo" className="h-8 w-auto flex-shrink-0" />
+          <div className="hidden sm:grid grid-cols-3 items-center gap-3 h-20 px-8">
+            <div className="relative justify-self-start min-w-0 pl-[29px]">
+              {/* Logo is taken out of flex flow (absolutely positioned) so
+                  the wordmark span is the column's only in-flow content -
+                  that keeps this column's own height (and thus its grid
+                  centering) driven purely by the text, not a mix of text
+                  and logo. Centering the logo on that same column then
+                  lands it on the row's shared centerline too, matching
+                  "Booking Settlement" and the date block, which are each
+                  centered the same way by items-center. */}
+              <img
+                src="/images/logo/CA-logo2.png"
+                alt="Casa Amiga logo"
+                className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-auto"
+              />
               <span className="font-display font-bold text-xl tracking-wide lowercase truncate">
                 casa amiga
               </span>
             </div>
-            <div className="justify-self-center text-sm font-bold tracking-wide uppercase text-center whitespace-nowrap">
+            <div className="justify-self-center text-lg font-bold tracking-wide uppercase text-center whitespace-nowrap">
               Booking Settlement
             </div>
             <div className="justify-self-end text-right text-xs text-white/75 leading-tight">
@@ -174,9 +186,16 @@ const SettlementPaper = React.forwardRef<HTMLDivElement, { data: SettlementData 
                   <MoneyRow label="Cleaning & Laundry" value={data.cleaningLaundryDeduction} negative />
                 )}
 
-                <div className="flex justify-between items-center gap-4 bg-blue-50 rounded px-4 py-3.5 mt-4">
+                {/* pdf-payout-box: no CSS centering technique renders this
+                    correctly under html2canvas (confirmed across flex,
+                    absolute+transform and explicit-height variants, all
+                    wrong in different ways) - handleArchive's onclone
+                    replaces this entire box with a pre-rendered bitmap for
+                    the PDF capture only. Live/print rendering (this markup)
+                    is unaffected and already correct. */}
+                <div className="pdf-payout-box flex justify-between items-center gap-4 bg-blue-50 rounded px-4 py-3.5 mt-4">
                   <span className="text-sm font-bold uppercase tracking-wide text-azure-hover">
-                    To be transferred to owner
+                    To be transferred
                   </span>
                   <span className="text-xl font-bold text-azure-hover tabular-nums">
                     {formatCurrencyPaper(data.toOwner)}
@@ -185,10 +204,6 @@ const SettlementPaper = React.forwardRef<HTMLDivElement, { data: SettlementData 
               </>
             )}
           </div>
-
-          <p className="text-center text-[11px] text-gray-400 mt-6">
-            Casa Amiga · Owner settlement statement, generated from confirmed booking &amp; revenue records.
-          </p>
         </div>
       </div>
     );

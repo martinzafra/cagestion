@@ -302,11 +302,130 @@ function SettlementsPageInner() {
       return;
     setArchiving(true);
     try {
-      const canvas = await html2canvas(paperRef.current, { scale: 2, backgroundColor: '#ffffff' });
+      // html2canvas can't reliably rasterize the ribbon's serif display font
+      // - it renders garbled, sometimes clipped glyphs no matter what font,
+      // alignment or spacing is in play. Sidestep its text layer entirely for
+      // just this span: pre-render "casa amiga" to a bitmap ourselves with
+      // the plain Canvas API (a completely different, unaffected code path)
+      // and swap it in only for the clone html2canvas actually captures -
+      // the live/print page never sees this. Canvas fillText needs the
+      // actual font face already loaded or it silently falls back, so make
+      // sure it's ready before drawing.
+      const wordmarkEl = paperRef.current.querySelector('.font-display');
+      if (wordmarkEl) {
+        const wordmarkStyle = getComputedStyle(wordmarkEl);
+        await document.fonts.load(`${wordmarkStyle.fontWeight} ${wordmarkStyle.fontSize} ${wordmarkStyle.fontFamily}`);
+        await document.fonts.ready;
+      }
+      const canvas = await html2canvas(paperRef.current, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        onclone: (clonedDoc, clonedEl) => {
+          const originals = paperRef.current!.querySelectorAll<HTMLElement>('.font-display');
+          const clones = clonedEl.querySelectorAll<HTMLElement>('.font-display');
+          clones.forEach((span, i) => {
+            const original = originals[i];
+            const rect = original.getBoundingClientRect();
+            const width = Math.ceil(rect.width);
+            const height = Math.ceil(rect.height);
+            const pixelRatio = 4;
+            const bitmap = clonedDoc.createElement('canvas');
+            bitmap.width = width * pixelRatio;
+            bitmap.height = height * pixelRatio;
+            const ctx = bitmap.getContext('2d')!;
+            ctx.scale(pixelRatio, pixelRatio);
+            const style = getComputedStyle(original);
+            ctx.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+            ctx.fillStyle = style.color;
+            ctx.textBaseline = 'middle';
+            if ('letterSpacing' in ctx) (ctx as any).letterSpacing = style.letterSpacing;
+            ctx.fillText(span.textContent || '', 0, height / 2);
+            const img = clonedDoc.createElement('img');
+            img.src = bitmap.toDataURL('image/png');
+            img.style.width = `${width}px`;
+            img.style.height = `${height}px`;
+            img.style.display = 'inline-block';
+            span.replaceWith(img);
+          });
+
+          // "To be transferred" payout box: html2canvas doesn't render this
+          // correctly under any CSS centering technique (confirmed across
+          // several variants - each wrong in a different way). Replace the
+          // whole box with one pre-rendered bitmap: background + both text
+          // strings drawn ourselves via the plain Canvas API, positioned
+          // from the live (correct) layout, so nothing about it depends on
+          // html2canvas's own layout or text engine.
+          const originalBox = paperRef.current!.querySelector<HTMLElement>('.pdf-payout-box');
+          const clonedBox = clonedEl.querySelector<HTMLElement>('.pdf-payout-box');
+          if (originalBox && clonedBox) {
+            const boxRect = originalBox.getBoundingClientRect();
+            const width = Math.ceil(boxRect.width);
+            const height = Math.ceil(boxRect.height);
+            const pixelRatio = 4;
+            const bitmap = clonedDoc.createElement('canvas');
+            bitmap.width = width * pixelRatio;
+            bitmap.height = height * pixelRatio;
+            const ctx = bitmap.getContext('2d')!;
+            ctx.scale(pixelRatio, pixelRatio);
+
+            const boxStyle = getComputedStyle(originalBox);
+            const radius = parseFloat(boxStyle.borderRadius) || 0;
+            ctx.fillStyle = boxStyle.backgroundColor;
+            ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(0, 0, width, height, radius);
+            else ctx.rect(0, 0, width, height);
+            ctx.fill();
+
+            const [labelEl, amountEl] = originalBox.querySelectorAll<HTMLElement>('span');
+            const labelRect = labelEl.getBoundingClientRect();
+            const amountRect = amountEl.getBoundingClientRect();
+            const labelStyle = getComputedStyle(labelEl);
+            const amountStyle = getComputedStyle(amountEl);
+
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = labelStyle.color;
+            ctx.font = `${labelStyle.fontWeight} ${labelStyle.fontSize} ${labelStyle.fontFamily}`;
+            if ('letterSpacing' in ctx) (ctx as any).letterSpacing = labelStyle.letterSpacing;
+            ctx.textAlign = 'left';
+            ctx.fillText(
+              (labelEl.textContent || '').toUpperCase(),
+              labelRect.left - boxRect.left,
+              labelRect.top - boxRect.top + labelRect.height / 2
+            );
+
+            ctx.fillStyle = amountStyle.color;
+            ctx.font = `${amountStyle.fontWeight} ${amountStyle.fontSize} ${amountStyle.fontFamily}`;
+            if ('letterSpacing' in ctx) (ctx as any).letterSpacing = amountStyle.letterSpacing;
+            ctx.textAlign = 'right';
+            ctx.fillText(
+              amountEl.textContent || '',
+              amountRect.right - boxRect.left,
+              amountRect.top - boxRect.top + amountRect.height / 2
+            );
+
+            const img = clonedDoc.createElement('img');
+            img.src = bitmap.toDataURL('image/png');
+            img.style.width = `${width}px`;
+            img.style.height = `${height}px`;
+            img.style.display = 'block';
+            img.style.marginTop = boxStyle.marginTop;
+            clonedBox.replaceWith(img);
+          }
+        },
+      });
       const imgData = canvas.toDataURL('image/png');
       const widthPt = canvas.width / 2;
       const heightPt = canvas.height / 2;
-      const pdf = new jsPDF({ unit: 'pt', format: [widthPt, heightPt] });
+      // jsPDF defaults to portrait and silently swaps a [w, h] format array
+      // to enforce it, which misaligns addImage below whenever the paper
+      // renders wider than tall (e.g. no revenue yet, so most rows are
+      // hidden) - pin the real orientation so the page always matches what
+      // we draw into it.
+      const pdf = new jsPDF({
+        unit: 'pt',
+        orientation: widthPt > heightPt ? 'landscape' : 'portrait',
+        format: [widthPt, heightPt],
+      });
       pdf.addImage(imgData, 'PNG', 0, 0, widthPt, heightPt);
       const blob = pdf.output('blob');
 

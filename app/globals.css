@@ -24,6 +24,17 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Browsers drop background colors/images when printing by default (an
+   ink-saving "economy" mode) unless told otherwise - without this, the
+   settlement ribbon's blue background disappears on Print/Save as PDF,
+   leaving its white text invisible against white paper. */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 body {
   font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI',
     'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
