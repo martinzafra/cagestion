@@ -13,6 +13,15 @@ import { getCountryOptions, isValidSpanishId, ageOn } from '@/lib/guestCheckin';
 
 type Lang = 'es' | 'en';
 
+// Look & feel borrowed from casaamiga.pl so guests land on something that
+// feels like the brand site: its hero photo, logo, Cormorant headings.
+const SITE_URL = 'https://casaamiga.pl';
+const LOGO_URL = 'https://casaamiga.pl/images/corp/CA-logo2.png';
+const HERO_URL = 'https://casaamiga.pl/images/background/2.jpg';
+const SERIF: React.CSSProperties = {
+  fontFamily: "var(--font-cormorant), 'Cormorant Garamond', Georgia, serif",
+};
+
 interface PublicCheckin {
   apartment_name: string;
   check_in_date: string;
@@ -65,6 +74,13 @@ const emptyGuest = (): GuestDraft => ({
 const TEXT = {
   es: {
     title: 'Registro de viajeros',
+    titleLead: 'Registro de',
+    titleAccent: 'viajeros',
+    eyebrow: 'Costa Tropical · España',
+    sectionPersonal: 'Datos personales',
+    sectionDocument: 'Documento de identidad',
+    sectionContact: 'Residencia y contacto',
+    footer: 'Alquiler vacacional con alma en la Costa Tropical de España.',
     intro:
       'La ley española (Real Decreto 933/2021) obliga a comunicar a la policía los datos de todas las personas que se alojan. Por favor, rellena los datos de cada viajero.',
     stay: 'Estancia',
@@ -124,6 +140,13 @@ const TEXT = {
   },
   en: {
     title: 'Guest registration',
+    titleLead: 'Guest',
+    titleAccent: 'registration',
+    eyebrow: 'Costa Tropical · Spain',
+    sectionPersonal: 'Personal details',
+    sectionDocument: 'Identity document',
+    sectionContact: 'Residence & contact',
+    footer: "Holiday rentals with soul on Spain's Costa Tropical.",
     intro:
       'Spanish law (Royal Decree 933/2021) requires us to report the details of everyone staying to the police. Please fill in the details of each guest.',
     stay: 'Stay',
@@ -313,13 +336,15 @@ export default function PublicGuestCheckinPage() {
   };
 
   const langSwitch = (
-    <div className="flex justify-end gap-1 text-sm">
+    <div className="flex gap-1 text-sm">
       {(['es', 'en'] as Lang[]).map((l) => (
         <button
           key={l}
           type="button"
           onClick={() => setLang(l)}
-          className={`px-2.5 py-1 rounded ${lang === l ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+          className={`px-3 py-1 rounded-full font-semibold transition ${
+            lang === l ? 'bg-white text-azure' : 'text-white/85 hover:bg-white/15'
+          }`}
         >
           {l.toUpperCase()}
         </button>
@@ -327,10 +352,55 @@ export default function PublicGuestCheckinPage() {
     </div>
   );
 
+  // Photo header like the brand site's hero: logo + language pills on top,
+  // the page's title block centred over the image.
+  const hero = (content: React.ReactNode) => (
+    <header
+      className="relative text-white bg-cover bg-center"
+      style={{
+        backgroundImage: `linear-gradient(180deg, rgba(8,40,60,.60) 0%, rgba(8,40,60,.45) 45%, rgba(8,40,60,.75) 100%), url(${HERO_URL})`,
+      }}
+    >
+      <div className="max-w-2xl mx-auto px-4 pt-5 pb-16 sm:pb-20">
+        <div className="flex items-center justify-between gap-3">
+          <a href={SITE_URL} className="flex items-center gap-2.5 min-w-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={LOGO_URL} alt="Casa Amiga" className="h-9 w-auto shrink-0" />
+            <span style={SERIF} className="text-2xl font-bold tracking-[0.06em] text-white/90 truncate">
+              casa amiga
+            </span>
+          </a>
+          {langSwitch}
+        </div>
+        <div className="text-center mt-10 sm:mt-14">{content}</div>
+      </div>
+    </header>
+  );
+
+  const eyebrow = (
+    <p style={SERIF} className="text-sky font-semibold uppercase tracking-[0.28em] text-sm sm:text-base">
+      {t.eyebrow}
+    </p>
+  );
+
+  const footer = (
+    <footer className="max-w-2xl mx-auto px-4 pt-8 pb-10 text-center border-t border-sand">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={LOGO_URL} alt="Casa Amiga" className="h-14 w-auto mx-auto" />
+      <p style={SERIF} className="text-2xl font-medium text-ink mt-2">
+        Casa Amiga
+      </p>
+      <p style={SERIF} className="text-gray-600 text-lg">{t.footer}</p>
+      <a href={SITE_URL} className="inline-block mt-2 text-azure font-medium hover:underline">
+        casaamiga.pl
+      </a>
+    </footer>
+  );
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center min-h-screen bg-linen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-azure"></div>
       </div>
     );
   }
@@ -342,15 +412,18 @@ export default function PublicGuestCheckinPage() {
       ? [t.notFoundTitle, t.notFoundText]
       : [t.closedTitle, t.closedText];
     return (
-      <div className="min-h-screen bg-linen py-8 px-4">
-        <div className="max-w-xl mx-auto">
-          {langSwitch}
-          <div className="text-center mt-16">
-            {done && <CheckCircle2 size={48} className="mx-auto text-green-600 mb-4" />}
-            <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-            <p className="text-gray-600 mt-2">{text}</p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-linen">
+        {hero(
+          <>
+            {eyebrow}
+            {done && <CheckCircle2 size={52} strokeWidth={1.5} className="mx-auto text-sky mt-6" />}
+            <h1 className="text-4xl sm:text-5xl font-light leading-tight mt-4">{title}</h1>
+            <p style={SERIF} className="text-xl text-white/90 mt-3 max-w-md mx-auto">
+              {text}
+            </p>
+          </>
+        )}
+        <div className="pt-10">{footer}</div>
       </div>
     );
   }
@@ -403,37 +476,61 @@ export default function PublicGuestCheckinPage() {
 
   const countryOptions = countries.map((c) => ({ value: c.code, label: c.name }));
 
+  const sectionTitle = (text: string) => (
+    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-azure mb-3">{text}</p>
+  );
+
   return (
-    <div className="min-h-screen bg-linen py-6 px-4">
-      <form onSubmit={handleSubmit} noValidate className="max-w-xl mx-auto space-y-5">
-        {langSwitch}
-
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">{t.title}</h1>
-          <p className="text-gray-900 font-medium mt-1">{checkin.apartment_name}</p>
-          <p className="text-gray-600 text-sm">
-            {t.stay}: {formatDate(checkin.check_in_date)} – {formatDate(checkin.check_out_date)}
-          </p>
-        </div>
-
-        <p className="text-sm text-gray-700">{t.intro}</p>
-
-        {checkin.submitted && (
-          <div className="rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm p-3">
-            {t.alreadySent}
+    <div className="min-h-screen bg-linen">
+      {hero(
+        <>
+          {eyebrow}
+          <h1 className="text-4xl sm:text-5xl font-light leading-tight mt-3">
+            {t.titleLead} <em className="italic text-sky">{t.titleAccent}</em>
+          </h1>
+          <div className="mt-5 inline-flex flex-wrap items-center justify-center gap-x-2 rounded-full bg-white/15 backdrop-blur-sm px-5 py-2 text-sm">
+            <span className="font-semibold">{checkin.apartment_name}</span>
+            <span className="text-white/60">·</span>
+            <span>
+              {formatDate(checkin.check_in_date)} – {formatDate(checkin.check_out_date)}
+            </span>
           </div>
-        )}
+        </>
+      )}
+
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        className="relative max-w-2xl mx-auto px-4 -mt-8 sm:-mt-10 pb-12 space-y-6"
+      >
+        <div className="card">
+          <p style={SERIF} className="text-lg sm:text-xl leading-snug text-gray-700">
+            {t.intro}
+          </p>
+          {checkin.submitted && (
+            <div className="mt-4 rounded-2xl bg-blue-50 text-azure text-sm p-3">{t.alreadySent}</div>
+          )}
+        </div>
 
         {guests.map((g, idx) => {
           const age = g.birth_date ? ageOn(g.birth_date) : null;
           const isSpanishId = g.document_type === 'NIF' || g.document_type === 'NIE';
           return (
-            <div key={idx} className="card space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-gray-900">
-                  {t.guest} {idx + 1}
-                  {idx === 0 && <span className="text-gray-500 font-normal"> · {t.lead}</span>}
-                </h2>
+            <div key={idx} className="card space-y-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="w-10 h-10 shrink-0 rounded-full bg-azure text-white flex items-center justify-center font-semibold">
+                    {idx + 1}
+                  </span>
+                  <div>
+                    <h2 className="text-2xl font-medium text-ink leading-none">
+                      {t.guest} {idx + 1}
+                    </h2>
+                    {idx === 0 && (
+                      <p className="text-xs uppercase tracking-[0.14em] text-gray-500 mt-1">{t.lead}</p>
+                    )}
+                  </div>
+                </div>
                 {guests.length > 1 && (
                   <button
                     type="button"
@@ -441,7 +538,7 @@ export default function PublicGuestCheckinPage() {
                       setGuests((prev) => prev.filter((_, i) => i !== idx));
                       setErrors({});
                     }}
-                    className="text-sm text-red-600 flex items-center gap-1 hover:bg-red-50 rounded px-2 py-1"
+                    className="text-sm text-red-600 flex items-center gap-1 hover:bg-red-50 rounded-full px-3 py-1.5"
                   >
                     <Trash2 size={14} />
                     {t.removeGuest}
@@ -449,6 +546,8 @@ export default function PublicGuestCheckinPage() {
                 )}
               </div>
 
+              <div className="border-t border-sand pt-5">
+              {sectionTitle(t.sectionPersonal)}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {field(idx, 'first_name', t.firstName, textInput(idx, 'first_name', 'text', 'given-name'))}
                 {field(idx, 'last_name_1', t.lastName1, textInput(idx, 'last_name_1', 'text', 'family-name'))}
@@ -462,9 +561,11 @@ export default function PublicGuestCheckinPage() {
                 {field(idx, 'birth_date', t.birthDate, textInput(idx, 'birth_date', 'date', 'bday'))}
                 {field(idx, 'nationality', t.nationality, selectInput(idx, 'nationality', countryOptions))}
               </div>
+              </div>
 
-              {age !== null && age < 14 && <p className="text-xs text-gray-500">{t.minorNote}</p>}
-
+              <div className="border-t border-sand pt-5">
+              {sectionTitle(t.sectionDocument)}
+              {age !== null && age < 14 && <p className="text-xs text-gray-500 -mt-1 mb-3">{t.minorNote}</p>}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {field(
                   idx,
@@ -492,7 +593,10 @@ export default function PublicGuestCheckinPage() {
                   textInput(idx, 'document_issue_date', 'date')
                 )}
               </div>
+              </div>
 
+              <div className="border-t border-sand pt-5">
+              {sectionTitle(t.sectionContact)}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2">
                   {field(idx, 'address', t.address, textInput(idx, 'address', 'text', 'street-address'))}
@@ -530,6 +634,7 @@ export default function PublicGuestCheckinPage() {
                     )
                   )}
               </div>
+              </div>
             </div>
           );
         })}
@@ -538,29 +643,39 @@ export default function PublicGuestCheckinPage() {
           <button
             type="button"
             onClick={() => setGuests((prev) => [...prev, emptyGuest()])}
-            className="btn-secondary w-full flex items-center justify-center gap-2"
+            style={SERIF}
+            className="w-full flex items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-sky text-azure text-lg font-medium py-4 hover:bg-white transition"
           >
             <Plus size={18} />
             {t.addGuest}
           </button>
         )}
 
-        <label className="flex items-start gap-2.5 text-sm text-gray-700">
-          <input
-            type="checkbox"
-            checked={consent}
-            onChange={(e) => setConsent(e.target.checked)}
-            className="mt-0.5 h-4 w-4 shrink-0"
-          />
-          {t.consent}
-        </label>
+        <div className="card space-y-5">
+          <label className="flex items-start gap-3 text-sm text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-azure"
+            />
+            {t.consent}
+          </label>
 
-        {formError && <p className="text-sm text-red-600 text-center">{formError}</p>}
+          {formError && <p className="text-sm text-red-600 text-center">{formError}</p>}
 
-        <button type="submit" disabled={sending} className="btn-primary w-full">
-          {sending ? t.sending : t.submit}
-        </button>
+          <button
+            type="submit"
+            disabled={sending}
+            style={SERIF}
+            className="btn-primary w-full justify-center py-3.5 text-xl tracking-wide disabled:opacity-60"
+          >
+            {sending ? t.sending : t.submit}
+          </button>
+        </div>
       </form>
+
+      {footer}
     </div>
   );
 }
