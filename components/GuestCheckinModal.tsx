@@ -142,8 +142,8 @@ export default function GuestCheckinModal({ bookingId, guestName, onClose, onGue
                 </button>
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Guests can submit until check-out. Once Police Registration is marked Done the
-                link stops accepting changes.
+                Guests can submit (and resend corrections) until Police Registration is marked
+                Done, even after check-out. Once it is Done the link stops accepting changes.
               </p>
             </div>
 
