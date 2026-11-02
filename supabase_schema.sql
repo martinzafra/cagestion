@@ -400,3 +400,60 @@ AS $$
     AND b.status != 'CANCELLED';
 $$;
 GRANT EXECUTE ON FUNCTION get_public_calendar_bookings(UUID) TO anon, authenticated;
+
+-- Guest self check-in: each booking gets an unguessable token that a share
+-- link is built from (/public/checkin/<token>). Guests open it and enter the
+-- traveller details the police registration (RD 933/2021, SES.HOSPEDAJES)
+-- requires. The anon key only reaches the SECURITY DEFINER functions below.
+-- Full definitions: supabase/migrations/20261102000000_guest_self_checkin.sql
+ALTER TABLE bookings
+  ADD COLUMN IF NOT EXISTS checkin_token UUID NOT NULL DEFAULT gen_random_uuid(),
+  ADD COLUMN IF NOT EXISTS checkin_submitted_at TIMESTAMP WITH TIME ZONE;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_checkin_token ON bookings(checkin_token);
+
+-- One row per traveller. Codes follow SES.HOSPEDAJES where it has them
+-- (document_type NIF/NIE/PAS/OTRO); countries are ISO 3166-1 alpha-2.
+CREATE TABLE IF NOT EXISTS booking_guests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL DEFAULT 1,
+  first_name TEXT NOT NULL,
+  last_name_1 TEXT NOT NULL,
+  last_name_2 TEXT,
+  sex TEXT NOT NULL CHECK (sex IN ('M', 'F', 'X')),
+  birth_date DATE NOT NULL,
+  nationality TEXT NOT NULL,
+  document_type TEXT CHECK (document_type IN ('NIF', 'NIE', 'PAS', 'OTRO')),
+  document_number TEXT,
+  document_support_number TEXT,
+  document_issue_date DATE,
+  address TEXT NOT NULL,
+  city TEXT NOT NULL,
+  postal_code TEXT,
+  country TEXT NOT NULL,
+  phone TEXT,
+  email TEXT,
+  relationship TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_booking_guests_booking ON booking_guests(booking_id);
+
+ALTER TABLE booking_guests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Registered users can view booking guests" ON booking_guests
+  FOR SELECT USING (is_registered_user());
+CREATE POLICY "Registered users can insert booking guests" ON booking_guests
+  FOR INSERT WITH CHECK (is_registered_user());
+CREATE POLICY "Registered users can update booking guests" ON booking_guests
+  FOR UPDATE USING (is_registered_user());
+CREATE POLICY "Registered users can delete booking guests" ON booking_guests
+  FOR DELETE USING (is_registered_user());
+
+-- get_public_checkin(p_token UUID): apartment name, dates, number_of_guests,
+--   submitted, can_submit - no guest data. GRANT to anon, authenticated.
+-- submit_guest_checkin(p_token UUID, p_guests JSONB): replaces the booking's
+--   travellers with the submitted list while the check-in is open (not
+--   cancelled, police registration not DONE, not past check-out).
+--   GRANT to anon, authenticated.

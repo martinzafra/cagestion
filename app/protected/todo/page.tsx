@@ -6,8 +6,9 @@ import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import StatusSquare from '@/components/StatusSquare';
 import { formatDate } from '@/lib/calculations';
-import { ChevronUp, ChevronDown, ChevronRight, Plus, Image as ImageIcon, Paperclip, X, Check, FileSpreadsheet } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronRight, Plus, Image as ImageIcon, Paperclip, X, Check, FileSpreadsheet, Users } from 'lucide-react';
 import Switch from '@/components/Switch';
+import GuestCheckinModal from '@/components/GuestCheckinModal';
 import { fetchAllowedApartments } from '@/lib/apartmentAccess';
 import { fetchCurrentUserRole } from '@/lib/userRole';
 import { compareSortValues } from '@/lib/sort';
@@ -48,6 +49,8 @@ interface BookingRow {
   final_liquidation_date: string | null;
   final_liquidation_file: string | null;
   inv_exp_done: boolean;
+  // Travellers submitted through the guest self check-in link.
+  guests: { count: number }[];
 }
 
 const todayISO = () => new Date().toISOString().split('T')[0];
@@ -122,6 +125,7 @@ export default function TodoPage() {
   // that becomes complete while you work on it doesn't vanish from view
   // mid-edit - it only drops off after the next refresh.
   const [pendingSnapshotIds, setPendingSnapshotIds] = useState<Set<string>>(new Set());
+  const [checkinBooking, setCheckinBooking] = useState<BookingRow | null>(null);
 
   const [filters, setFilters] = useState({
     apartment_id: '',
@@ -167,7 +171,8 @@ export default function TodoPage() {
           police_registration, police_registration_file,
           platform_invoice, platform_invoice_date,
           final_liquidation, final_liquidation_date, final_liquidation_file,
-          inv_exp_done
+          inv_exp_done,
+          guests:booking_guests(count)
         `)
         .neq('status', 'CANCELLED')
         .order('check_in_date', { ascending: true });
@@ -228,6 +233,7 @@ export default function TodoPage() {
       { header: 'Guest Instructions', value: (b) => b.guest_instructions },
       { header: 'Police Registration', value: (b) => b.police_registration },
       { header: 'Police Registration Photo', value: (b) => (b.police_registration_file ? 'Yes' : 'No') },
+      { header: 'Guests Registered', value: (b) => guestCount(b) },
       { header: 'Owner Invoice', value: (b) => b.platform_invoice },
       { header: 'CA Inv/Coll & Settlement', value: (b) => b.final_liquidation },
       { header: 'CA Inv/Coll & Settlement Date', value: (b) => b.final_liquidation_date },
@@ -409,6 +415,28 @@ export default function TodoPage() {
     }
   };
 
+  const guestCount = (b: BookingRow) => b.guests?.[0]?.count || 0;
+
+  // Opens the guest check-in panel (share link + submitted travellers).
+  const renderCheckinButton = (b: BookingRow) => {
+    const count = guestCount(b);
+    return (
+      <button
+        type="button"
+        onClick={() => setCheckinBooking(b)}
+        title={count ? `${count} guest(s) registered — view / share link` : 'Guest check-in link'}
+        className="relative p-1 hover:bg-gray-200 rounded"
+      >
+        <Users size={14} className={count ? 'text-green-600' : 'text-gray-500'} />
+        {count > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-green-600 text-white text-[9px] font-bold leading-[14px] text-center">
+            {count}
+          </span>
+        )}
+      </button>
+    );
+  };
+
   const handleViewLiquidationFile = async (path: string) => {
     try {
       const { data, error } = await supabase.storage
@@ -546,13 +574,13 @@ export default function TodoPage() {
           <table className="table [table-layout:fixed] w-full text-xs [&_th]:text-xs [&_th]:px-2 [&_th]:py-1.5 [&_td]:text-xs [&_td]:px-2 [&_td]:py-1.5">
             <colgroup>
               <col className="w-[90px]" />
-              <col className="w-[220px]" />
+              <col className="w-[195px]" />
               <col className="w-[50px]" />
               <col className="w-[75px]" />
               <col className="w-[80px]" />
               <col className="w-[165px]" />
               <col className="w-[70px]" />
-              <col className="w-[70px]" />
+              <col className="w-[95px]" />
               <col className="w-[70px]" />
               <col className="w-[70px]" />
               <col className="w-[70px]" />
@@ -635,6 +663,7 @@ export default function TodoPage() {
                       </td>
                       <td>
                         <div className="flex flex-nowrap gap-1 items-center justify-center">
+                          {renderCheckinButton(b)}
                           {b.police_registration_file ? (
                             <div className="flex flex-col items-center">
                               <button
@@ -837,6 +866,7 @@ export default function TodoPage() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Police Registration</span>
                       <div className="flex items-center gap-1.5">
+                        {renderCheckinButton(b)}
                         {b.police_registration_file ? (
                           <>
                             <button
@@ -959,6 +989,19 @@ export default function TodoPage() {
           )}
         </div>
         </div>
+      )}
+
+      {checkinBooking && (
+        <GuestCheckinModal
+          bookingId={checkinBooking.id}
+          guestName={checkinBooking.guest_name}
+          onClose={() => setCheckinBooking(null)}
+          onGuestsChange={(count) =>
+            setBookings((prev) =>
+              prev.map((b) => (b.id === checkinBooking.id ? { ...b, guests: [{ count }] } : b))
+            )
+          }
+        />
       )}
     </div>
   );
