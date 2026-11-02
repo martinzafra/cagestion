@@ -28,6 +28,8 @@ export type BookingGuest = {
   phone: string | null;
   email: string | null;
   relationship: string | null;
+  // INE code of the home town, entered by the admin for SES (Spain only).
+  municipality_code: string | null;
   created_at: string;
 };
 

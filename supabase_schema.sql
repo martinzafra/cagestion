@@ -451,6 +451,12 @@ CREATE POLICY "Registered users can update booking guests" ON booking_guests
 CREATE POLICY "Registered users can delete booking guests" ON booking_guests
   FOR DELETE USING (is_registered_user());
 
+-- SES XML (police "parte de viajeros"): the apartment's establishment code
+-- and, for travellers living in Spain, the INE municipality code the admin
+-- enters in the check-in panel.
+ALTER TABLE inventory_apartments ADD COLUMN IF NOT EXISTS ses_establishment_code TEXT;
+ALTER TABLE booking_guests ADD COLUMN IF NOT EXISTS municipality_code TEXT;
+
 -- get_public_checkin(p_token UUID): apartment name, dates, number_of_guests,
 --   submitted, can_submit - no guest data. GRANT to anon, authenticated.
 -- submit_guest_checkin(p_token UUID, p_guests JSONB): replaces the booking's

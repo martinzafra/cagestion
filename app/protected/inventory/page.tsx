@@ -13,6 +13,7 @@ interface TabItem {
   id: string;
   name: string;
   owner_name?: string | null;
+  ses_establishment_code?: string | null;
   settle_cleaning_charge?: boolean;
   commission_percentage?: number;
   contract?: 'None' | 'Yearly' | 'Unlimited';
@@ -290,6 +291,7 @@ export default function InventoryPage() {
     id: string,
     field:
       | 'owner_name'
+      | 'ses_establishment_code'
       | 'settle_cleaning_charge'
       | 'commission_percentage'
       | 'contract'
@@ -521,6 +523,22 @@ export default function InventoryPage() {
                         persistApartmentField(item.id, 'owner_name', e.target.value || null)
                       }
                       className="input text-base sm:text-sm"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-gray-500">SES.HOSPEDAJES establishment code</label>
+                    <input
+                      type="text"
+                      maxLength={10}
+                      placeholder="Code assigned by SES (police XML)"
+                      value={item.ses_establishment_code ?? ''}
+                      onChange={(e) =>
+                        handleApartmentFieldChange(item.id, 'ses_establishment_code', e.target.value)
+                      }
+                      onBlur={(e) =>
+                        persistApartmentField(item.id, 'ses_establishment_code', e.target.value.trim() || null)
+                      }
+                      className="input text-base sm:text-sm font-mono"
                     />
                   </div>
                   <div>

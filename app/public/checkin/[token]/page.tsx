@@ -221,11 +221,14 @@ function validate(guests: GuestDraft[], t: (typeof TEXT)[Lang]): Errors {
       'nationality',
       'address',
       'city',
+      'postal_code',
       'country',
     ];
     required.forEach((field) => {
       if (!g[field].trim()) e[field] = t.errRequired;
     });
+    // SES requires the second surname whenever the document is a Spanish DNI.
+    if (g.document_type === 'NIF' && !g.last_name_2.trim()) e.last_name_2 = t.errRequired;
 
     if (g.birth_date && g.birth_date > todayKey) e.birth_date = t.errFuture;
     const age = g.birth_date ? ageOn(g.birth_date) : null;
@@ -551,7 +554,12 @@ export default function PublicGuestCheckinPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {field(idx, 'first_name', t.firstName, textInput(idx, 'first_name', 'text', 'given-name'))}
                 {field(idx, 'last_name_1', t.lastName1, textInput(idx, 'last_name_1', 'text', 'family-name'))}
-                {field(idx, 'last_name_2', `${t.lastName2} ${t.optional}`, textInput(idx, 'last_name_2'))}
+                {field(
+                  idx,
+                  'last_name_2',
+                  g.document_type === 'NIF' ? t.lastName2 : `${t.lastName2} ${t.optional}`,
+                  textInput(idx, 'last_name_2')
+                )}
                 {field(
                   idx,
                   'sex',
@@ -605,7 +613,7 @@ export default function PublicGuestCheckinPage() {
                 {field(
                   idx,
                   'postal_code',
-                  `${t.postalCode} ${t.optional}`,
+                  t.postalCode,
                   textInput(idx, 'postal_code', 'text', 'postal-code')
                 )}
                 {field(idx, 'country', t.country, selectInput(idx, 'country', countryOptions))}
