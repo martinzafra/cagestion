@@ -10,6 +10,7 @@ import {
   RELATIONSHIP_LABELS,
   SEX_LABELS,
   getCountryName,
+  ageOn,
 } from '@/lib/guestCheckin';
 
 interface Props {
@@ -88,13 +89,30 @@ export default function GuestCheckinModal({ bookingId, guestName, onClose, onGue
     }
   };
 
-  const detail = (label: string, value: React.ReactNode) =>
-    value ? (
-      <div>
-        <span className="text-gray-500">{label}: </span>
-        {value}
-      </div>
-    ) : null;
+  // Every field is listed, empty ones as a dash, so each traveller can be
+  // checked line by line against their passport / DNI.
+  const guestFields = (g: BookingGuest): [string, React.ReactNode][] => [
+    ['First name', g.first_name],
+    ['Surname', g.last_name_1],
+    ['Second surname', g.last_name_2],
+    ['Sex', SEX_LABELS[g.sex]],
+    ['Date of birth', g.birth_date && `${formatDate(g.birth_date)} (${ageOn(g.birth_date)} years)`],
+    ['Nationality', getCountryName(g.nationality)],
+    ['Document type', g.document_type && DOCUMENT_TYPE_LABELS[g.document_type]],
+    ['Document number', g.document_number && <span className="font-mono">{g.document_number}</span>],
+    [
+      'Support number',
+      g.document_support_number && <span className="font-mono">{g.document_support_number}</span>,
+    ],
+    ['Issue date', g.document_issue_date && formatDate(g.document_issue_date)],
+    ['Address', g.address],
+    ['City', g.city],
+    ['Postcode', g.postal_code],
+    ['Country of residence', getCountryName(g.country)],
+    ['Phone', g.phone],
+    ['Email', g.email],
+    ['Relationship (minor)', g.relationship && RELATIONSHIP_LABELS[g.relationship]],
+  ];
 
   return (
     <div
@@ -102,7 +120,7 @@ export default function GuestCheckinModal({ bookingId, guestName, onClose, onGue
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-2xl my-8"
+        className="bg-white rounded-xl shadow-xl w-full max-w-3xl my-8"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b">
@@ -176,27 +194,16 @@ export default function GuestCheckinModal({ bookingId, guestName, onClose, onGue
                           <Trash2 size={14} className="text-red-500" />
                         </button>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5 mt-1.5">
-                        {detail('Sex', SEX_LABELS[g.sex])}
-                        {detail('Born', formatDate(g.birth_date))}
-                        {detail('Nationality', getCountryName(g.nationality))}
-                        {detail(
-                          'Document',
-                          g.document_type &&
-                            `${DOCUMENT_TYPE_LABELS[g.document_type]} ${g.document_number || ''}`
-                        )}
-                        {detail('Support no.', g.document_support_number)}
-                        {detail('Issued', g.document_issue_date && formatDate(g.document_issue_date))}
-                        {detail(
-                          'Address',
-                          [g.address, g.postal_code, g.city, getCountryName(g.country)]
-                            .filter(Boolean)
-                            .join(', ')
-                        )}
-                        {detail('Phone', g.phone)}
-                        {detail('Email', g.email)}
-                        {detail('Relationship', g.relationship && RELATIONSHIP_LABELS[g.relationship])}
-                      </div>
+                      <dl className="grid grid-cols-[auto_1fr] sm:grid-cols-[auto_1fr_auto_1fr] gap-x-3 gap-y-1 mt-2">
+                        {guestFields(g).map(([label, value]) => (
+                          <React.Fragment key={label}>
+                            <dt className="text-gray-500 whitespace-nowrap">{label}</dt>
+                            <dd className="text-gray-900 break-words min-w-0">
+                              {value || <span className="text-gray-300">—</span>}
+                            </dd>
+                          </React.Fragment>
+                        ))}
+                      </dl>
                     </div>
                   ))}
                 </div>
