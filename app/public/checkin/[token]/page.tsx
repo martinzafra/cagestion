@@ -2,10 +2,18 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Plus, Trash2, CheckCircle2 } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2, MapPin } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatDate } from '@/lib/calculations';
-import { getCountryOptions, isValidSpanishId, ageOn } from '@/lib/guestCheckin';
+import {
+  getCountryOptions,
+  isValidSpanishId,
+  ageOn,
+  loadMunicipalities,
+  normalizeText,
+  Municipality,
+  SPANISH_PROVINCES,
+} from '@/lib/guestCheckin';
 
 // Guest-facing traveller registration, opened from the per-booking link the
 // admin shares from To Do. Unauthenticated: everything goes through the
@@ -46,10 +54,26 @@ interface GuestDraft {
   city: string;
   postal_code: string;
   country: string;
+  // INE code of the Spanish municipality picked from the list (Spain only).
+  municipality_code: string;
   phone: string;
   email: string;
   relationship: string;
 }
+
+// Field limits of the SES.HOSPEDAJES XML, enforced while typing.
+const MAX_LENGTH: Partial<Record<keyof GuestDraft, number>> = {
+  first_name: 50,
+  last_name_1: 50,
+  last_name_2: 50,
+  document_number: 15,
+  document_support_number: 9,
+  address: 100,
+  city: 100,
+  postal_code: 20,
+  phone: 20,
+  email: 250,
+};
 
 const emptyGuest = (): GuestDraft => ({
   first_name: '',
@@ -66,6 +90,7 @@ const emptyGuest = (): GuestDraft => ({
   city: '',
   postal_code: '',
   country: '',
+  municipality_code: '',
   phone: '',
   email: '',
   relationship: '',
@@ -137,6 +162,17 @@ const TEXT = {
     errFix: 'Revisa los campos marcados en rojo.',
     errConsent: 'Debes aceptar para continuar.',
     errSend: 'No se pudieron enviar los datos. Inténtalo de nuevo.',
+    municipality: 'Municipio',
+    municipalitySearch: 'Escribe para buscar tu municipio...',
+    municipalityChange: 'Cambiar',
+    municipalityNone: 'No se encontró ningún municipio.',
+    errMunicipality: 'Elige tu municipio de la lista',
+    errPostalEs: 'Código postal español de 5 dígitos',
+    errPostalProvince: 'No corresponde a la provincia del municipio',
+    errDocFormat: 'Solo letras y números (máx. 15)',
+    errSupportFormat: '9 letras/números, tal como aparece en el documento',
+    errPhone: 'Teléfono no válido',
+    errBirth: 'Fecha de nacimiento no válida',
   },
   en: {
     title: 'Guest registration',
@@ -203,6 +239,17 @@ const TEXT = {
     errFix: 'Please check the fields marked in red.',
     errConsent: 'You must accept to continue.',
     errSend: "Your details couldn't be sent. Please try again.",
+    municipality: 'Town / municipality',
+    municipalitySearch: 'Type to search your town...',
+    municipalityChange: 'Change',
+    municipalityNone: 'No municipality found.',
+    errMunicipality: 'Choose your town from the list',
+    errPostalEs: 'Spanish postcode of 5 digits',
+    errPostalProvince: "Doesn't match the town's province",
+    errDocFormat: 'Letters and numbers only (max. 15)',
+    errSupportFormat: '9 letters/numbers, as printed on the card',
+    errPhone: 'Invalid phone number',
+    errBirth: 'Invalid date of birth',
   },
 };
 
@@ -231,32 +278,146 @@ function validate(guests: GuestDraft[], t: (typeof TEXT)[Lang]): Errors {
     if (g.document_type === 'NIF' && !g.last_name_2.trim()) e.last_name_2 = t.errRequired;
 
     if (g.birth_date && g.birth_date > todayKey) e.birth_date = t.errFuture;
+    else if (g.birth_date && g.birth_date < '1900-01-01') e.birth_date = t.errBirth;
     const age = g.birth_date ? ageOn(g.birth_date) : null;
+    const isSpanishId = g.document_type === 'NIF' || g.document_type === 'NIE';
+    const docNumber = g.document_number.replace(/[\s-]/g, '');
 
     if (age === null || age >= 14) {
       if (!g.document_type) e.document_type = t.errRequired;
-      if (!g.document_number.trim()) {
-        e.document_number = t.errRequired;
-      } else if (
-        (g.document_type === 'NIF' || g.document_type === 'NIE') &&
-        !isValidSpanishId(g.document_type, g.document_number)
-      ) {
+      if (!docNumber) e.document_number = t.errRequired;
+      if (isSpanishId && !g.document_support_number.trim()) e.document_support_number = t.errRequired;
+    }
+    // Whatever is typed must be valid, even where it is optional (minors).
+    if (docNumber) {
+      if (isSpanishId && !isValidSpanishId(g.document_type as 'NIF' | 'NIE', docNumber)) {
         e.document_number = t.errDocInvalid;
+      } else if (!/^[A-Za-z0-9]{1,15}$/.test(docNumber)) {
+        e.document_number = t.errDocFormat;
       }
-      if ((g.document_type === 'NIF' || g.document_type === 'NIE') && !g.document_support_number.trim()) {
-        e.document_support_number = t.errRequired;
-      }
+    }
+    if (g.document_support_number.trim() && !/^[A-Za-z0-9]{9}$/.test(g.document_support_number.trim())) {
+      e.document_support_number = t.errSupportFormat;
     }
     if (g.document_issue_date && g.document_issue_date > todayKey) e.document_issue_date = t.errFuture;
 
+    // SES identifies Spanish towns by their INE code, so guests living in
+    // Spain pick theirs from the official list; the postcode must then be a
+    // Spanish one from the same province (its first two digits).
+    if (g.country === 'ES') {
+      if (!/^\d{5}$/.test(g.municipality_code)) e.city = t.errMunicipality;
+      if (g.postal_code.trim()) {
+        if (!/^\d{5}$/.test(g.postal_code.trim())) e.postal_code = t.errPostalEs;
+        else if (g.municipality_code && g.postal_code.slice(0, 2) !== g.municipality_code.slice(0, 2)) {
+          e.postal_code = t.errPostalProvince;
+        }
+      }
+    }
+
     if (age !== null && age < 18 && !g.relationship) e.relationship = t.errRequired;
     if ((age === null || age >= 18) && !g.phone.trim()) e.phone = t.errRequired;
+    if (g.phone.trim() && !/^\+?[\d\s().-]{6,20}$/.test(g.phone.trim())) e.phone = t.errPhone;
     if (idx === 0 && !g.email.trim()) e.email = t.errRequired;
     if (g.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(g.email.trim())) e.email = t.errEmail;
 
     if (Object.keys(e).length) errors[idx] = e;
   });
   return errors;
+}
+
+// Search-as-you-type over the INE municipality list, for guests living in
+// Spain. Matches from the postcode's province come first.
+function MunicipalityPicker({
+  code,
+  name,
+  postalCode,
+  invalid,
+  t,
+  onPick,
+}: {
+  code: string;
+  name: string;
+  postalCode: string;
+  invalid: boolean;
+  t: (typeof TEXT)[Lang];
+  onPick: (code: string, name: string) => void;
+}) {
+  const [all, setAll] = useState<Municipality[]>([]);
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    loadMunicipalities().then(setAll);
+  }, []);
+
+  const results = useMemo(() => {
+    const q = normalizeText(query);
+    if (q.length < 2) return [];
+    const province = /^\d{5}$/.test(postalCode.trim()) ? postalCode.slice(0, 2) : '';
+    return all
+      .map((m) => ({ m, n: normalizeText(m[1]) }))
+      .filter(({ n }) => n.includes(q))
+      .sort(
+        (a, b) =>
+          Number(b.m[0].startsWith(province) && !!province) - Number(a.m[0].startsWith(province) && !!province) ||
+          Number(b.n.startsWith(q)) - Number(a.n.startsWith(q)) ||
+          a.n.localeCompare(b.n)
+      )
+      .slice(0, 8)
+      .map(({ m }) => m);
+  }, [all, query, postalCode]);
+
+  if (code) {
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-xl border border-gray-300 bg-white px-3.5 py-2.5">
+        <span className="flex items-center gap-2 min-w-0">
+          <MapPin size={16} className="text-azure shrink-0" />
+          <span className="truncate">
+            {name} <span className="text-gray-500">({SPANISH_PROVINCES[code.slice(0, 2)]})</span>
+          </span>
+        </span>
+        <button
+          type="button"
+          onClick={() => {
+            setQuery('');
+            onPick('', '');
+          }}
+          className="text-sm text-azure font-medium shrink-0 hover:underline"
+        >
+          {t.municipalityChange}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <input
+        type="text"
+        value={query}
+        placeholder={t.municipalitySearch}
+        onChange={(e) => setQuery(e.target.value)}
+        className={`input w-full ${invalid ? '!border-red-500' : ''}`}
+      />
+      {normalizeText(query).length >= 2 && (
+        <div className="mt-1 rounded-xl border border-gray-200 bg-white shadow-card overflow-hidden">
+          {results.length === 0 ? (
+            <p className="px-3.5 py-2.5 text-sm text-gray-500">{t.municipalityNone}</p>
+          ) : (
+            results.map(([c, n]) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => onPick(c, n)}
+                className="block w-full text-left px-3.5 py-2.5 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
+              >
+                {n} <span className="text-gray-500">({SPANISH_PROVINCES[c.slice(0, 2)]})</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function PublicGuestCheckinPage() {
@@ -300,8 +461,19 @@ export default function PublicGuestCheckinPage() {
     load();
   }, [token]);
 
-  const updateGuest = (idx: number, field: keyof GuestDraft, value: string) => {
-    setGuests((prev) => prev.map((g, i) => (i === idx ? { ...g, [field]: value } : g)));
+  const updateGuest = (idx: number, field: keyof GuestDraft, value: string, extra?: Partial<GuestDraft>) => {
+    setGuests((prev) =>
+      prev.map((g, i) => {
+        if (i !== idx) return g;
+        const next = { ...g, [field]: value, ...extra };
+        // Switching the country invalidates a town picked from the Spanish list.
+        if (field === 'country' && (value === 'ES') !== (g.country === 'ES')) {
+          next.city = '';
+          next.municipality_code = '';
+        }
+        return next;
+      })
+    );
     if (errors[idx]?.[field]) {
       setErrors((prev) => {
         const next = { ...prev, [idx]: { ...prev[idx] } };
@@ -457,6 +629,7 @@ export default function PublicGuestCheckinPage() {
       type={type}
       value={guests[idx][name]}
       autoComplete={autoComplete}
+      maxLength={MAX_LENGTH[name]}
       onChange={(e) => updateGuest(idx, name, e.target.value)}
       className={inputClass(idx, name)}
     />
@@ -609,14 +782,32 @@ export default function PublicGuestCheckinPage() {
                 <div className="sm:col-span-2">
                   {field(idx, 'address', t.address, textInput(idx, 'address', 'text', 'street-address'))}
                 </div>
-                {field(idx, 'city', t.city, textInput(idx, 'city', 'text', 'address-level2'))}
+                {field(idx, 'country', t.country, selectInput(idx, 'country', countryOptions))}
                 {field(
                   idx,
                   'postal_code',
                   t.postalCode,
                   textInput(idx, 'postal_code', 'text', 'postal-code')
                 )}
-                {field(idx, 'country', t.country, selectInput(idx, 'country', countryOptions))}
+                {g.country === 'ES' ? (
+                  <div className="sm:col-span-2">
+                    {field(
+                      idx,
+                      'city',
+                      t.municipality,
+                      <MunicipalityPicker
+                        code={g.municipality_code}
+                        name={g.city}
+                        postalCode={g.postal_code}
+                        invalid={!!errors[idx]?.city}
+                        t={t}
+                        onPick={(code, name) => updateGuest(idx, 'city', name, { municipality_code: code })}
+                      />
+                    )}
+                  </div>
+                ) : (
+                  field(idx, 'city', t.city, textInput(idx, 'city', 'text', 'address-level2'))
+                )}
                 {field(
                   idx,
                   'phone',

@@ -68,6 +68,42 @@ export function isValidSpanishId(type: 'NIF' | 'NIE', value: string): boolean {
   return DNI_LETTERS[parseInt(digits, 10) % 23] === match[2];
 }
 
+// Spanish provinces by INE code (also the first two digits of their
+// postcodes), to label municipalities in the picker.
+export const SPANISH_PROVINCES: Record<string, string> = {
+  '01': 'Araba/Álava', '02': 'Albacete', '03': 'Alicante/Alacant', '04': 'Almería', '05': 'Ávila',
+  '06': 'Badajoz', '07': 'Illes Balears', '08': 'Barcelona', '09': 'Burgos', '10': 'Cáceres',
+  '11': 'Cádiz', '12': 'Castellón/Castelló', '13': 'Ciudad Real', '14': 'Córdoba', '15': 'A Coruña',
+  '16': 'Cuenca', '17': 'Girona', '18': 'Granada', '19': 'Guadalajara', '20': 'Gipuzkoa',
+  '21': 'Huelva', '22': 'Huesca', '23': 'Jaén', '24': 'León', '25': 'Lleida', '26': 'La Rioja',
+  '27': 'Lugo', '28': 'Madrid', '29': 'Málaga', '30': 'Murcia', '31': 'Navarra', '32': 'Ourense',
+  '33': 'Asturias', '34': 'Palencia', '35': 'Las Palmas', '36': 'Pontevedra', '37': 'Salamanca',
+  '38': 'Santa Cruz de Tenerife', '39': 'Cantabria', '40': 'Segovia', '41': 'Sevilla', '42': 'Soria',
+  '43': 'Tarragona', '44': 'Teruel', '45': 'Toledo', '46': 'Valencia/València', '47': 'Valladolid',
+  '48': 'Bizkaia', '49': 'Zamora', '50': 'Zaragoza', '51': 'Ceuta', '52': 'Melilla',
+};
+
+// [INE code, name] for every Spanish municipality, from the INE municipality
+// dictionary (public/data/ine-municipios.json). Loaded on demand - only
+// guests living in Spain need it.
+export type Municipality = [string, string];
+let municipalitiesPromise: Promise<Municipality[]> | null = null;
+export function loadMunicipalities(): Promise<Municipality[]> {
+  if (!municipalitiesPromise) {
+    municipalitiesPromise = fetch('/data/ine-municipios.json')
+      .then((r) => r.json())
+      .catch(() => {
+        municipalitiesPromise = null;
+        return [];
+      });
+  }
+  return municipalitiesPromise;
+}
+
+// Lower-case, accent-free, for forgiving search ("almunecar" finds "Almuñécar").
+export const normalizeText = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
 // Whole years between birth and today.
 export function ageOn(birthDate: string, today = new Date()): number {
   const birth = new Date(`${birthDate}T00:00:00`);
