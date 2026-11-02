@@ -104,6 +104,10 @@ export function loadMunicipalities(): Promise<Municipality[]> {
 export const normalizeText = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
+// SES (v1.2.0) only accepts names written in Latin script: letters with any
+// accents, plus spaces, hyphens, apostrophes and dots.
+export const isLatinName = (s: string) => /^[\p{Script=Latin}\p{M}\s'’.-]+$/u.test(s.trim());
+
 // Whole years between birth and today.
 export function ageOn(birthDate: string, today = new Date()): number {
   const birth = new Date(`${birthDate}T00:00:00`);

@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/calculations';
 import {
   getCountryOptions,
   isValidSpanishId,
+  isLatinName,
   ageOn,
   loadMunicipalities,
   normalizeText,
@@ -173,6 +174,7 @@ const TEXT = {
     errSupportFormat: '9 letras/números, tal como aparece en el documento',
     errPhone: 'Teléfono no válido',
     errBirth: 'Fecha de nacimiento no válida',
+    errLatin: 'Escríbelo con letras latinas, como en el pasaporte',
   },
   en: {
     title: 'Guest registration',
@@ -250,6 +252,7 @@ const TEXT = {
     errSupportFormat: '9 letters/numbers, as printed on the card',
     errPhone: 'Invalid phone number',
     errBirth: 'Invalid date of birth',
+    errLatin: 'Use Latin letters, as in your passport',
   },
 };
 
@@ -276,6 +279,10 @@ function validate(guests: GuestDraft[], t: (typeof TEXT)[Lang]): Errors {
     });
     // SES requires the second surname whenever the document is a Spanish DNI.
     if (g.document_type === 'NIF' && !g.last_name_2.trim()) e.last_name_2 = t.errRequired;
+    // ...and accepts names in Latin script only (as on the passport's MRZ line).
+    (['first_name', 'last_name_1', 'last_name_2'] as const).forEach((field) => {
+      if (g[field].trim() && !isLatinName(g[field])) e[field] = t.errLatin;
+    });
 
     if (g.birth_date && g.birth_date > todayKey) e.birth_date = t.errFuture;
     else if (g.birth_date && g.birth_date < '1900-01-01') e.birth_date = t.errBirth;

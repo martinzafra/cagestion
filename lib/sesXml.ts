@@ -1,11 +1,11 @@
 import type { BookingGuest } from '@/lib/supabase';
-import { ageOn } from '@/lib/guestCheckin';
+import { ageOn, isLatinName } from '@/lib/guestCheckin';
 
 // Builds the "parte de viajeros" XML that SES.HOSPEDAJES accepts through its
-// bulk upload ("Alta masiva de comunicaciones"). Structure and codes follow
-// the Ministry's "Instrucciones alta masiva v1.1.1" and the web-service spec
-// "Servicio de Hospedajes - Comunicaciones v3.1.2" (same XSD):
-//   <alt:peticion xmlns:alt="http://www.neg.hospedajes.mir.es/altaParteHospedaje">
+// bulk upload ("Alta masiva de comunicaciones"). Structure, element order and
+// codes follow the Ministry's "Instrucciones alta masiva v1.2.0" (Sept 2025)
+// and the template the SES portal hands out (1-plantilla.xml):
+//   <ns2:peticion xmlns:ns2="http://www.neg.hospedajes.mir.es/altaParteHospedaje">
 //     <solicitud><codigoEstablecimiento/><comunicacion><contrato/><persona/>...
 
 export const SES_PAYMENT_TYPES: Record<string, string> = {
@@ -23,9 +23,10 @@ export const SES_PAYMENT_TYPES: Record<string, string> = {
 const SEX_CODES: Record<string, string> = { M: 'H', F: 'M', X: 'O' };
 
 // The guest form asks a minor for the adult's relationship to them
-// ("parent" = the adult is their parent). SES wants it as TIPO_PARENTESCO
-// codes: on the adult, their relation to the minor; on the minor, the
-// inverse (the Ministry's own example puts HJ on the child).
+// ("parent" = the adult is their parent). SES v1.2.0 accepts it either way
+// round - the minor's relation to an adult, or the adult's to the minor - so
+// both are sent: the inverse on the minor (HJ, as in the Ministry's own
+// example) and the direct one on the first adult (PM).
 const ADULT_RELATIONSHIP: Record<string, string> = {
   parent: 'PM',
   guardian: 'TU',
@@ -120,13 +121,30 @@ export function sesProblems(booking: SesBooking, guests: BookingGuest[]): string
     problems.push('SES establishment code missing for this apartment (Inventory → Apartments).');
   }
   if (!booking.payment_type) problems.push('Choose the payment type.');
+  // v1.2.0 date windows: entry after (today - 1 year) and before exit; exit
+  // before (today + 5 years).
+  const entry = dateTime(booking.check_in_date, booking.check_in_time, '15:00');
+  const exit = dateTime(booking.check_out_date, booking.check_out_time, '11:00');
+  const now = new Date();
+  const yearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).toISOString().slice(0, 10);
+  const inFiveYears = new Date(now.getFullYear() + 5, now.getMonth(), now.getDate()).toISOString().slice(0, 10);
+  if (entry >= exit) problems.push('Check-in must be before check-out.');
+  if (booking.check_in_date < yearAgo) problems.push('SES only accepts stays that started less than a year ago.');
+  if (booking.check_out_date > inFiveYears) problems.push('Check-out is more than five years ahead.');
   if (guests.length === 0) problems.push('No guests registered yet.');
   const hasContact = guests.some((g) => g.phone || g.email);
   if (!hasContact) problems.push('At least one guest needs a phone or email.');
   guests.forEach((g) => {
     const name = `${g.position}. ${g.first_name} ${g.last_name_1}`;
-    const adult = ageOn(g.birth_date) >= 18;
-    if (adult && (!g.document_type || !g.document_number)) problems.push(`${name}: identity document missing.`);
+    const age = ageOn(g.birth_date);
+    const adult = age >= 18;
+    // v1.2.0: document required for adults, and for Spaniards over 14.
+    if ((adult || (age >= 14 && g.nationality === 'ES')) && (!g.document_type || !g.document_number)) {
+      problems.push(`${name}: identity document missing.`);
+    }
+    if (![g.first_name, g.last_name_1, g.last_name_2].every((n) => !n || isLatinName(n))) {
+      problems.push(`${name}: names must use Latin characters only.`);
+    }
     if (g.document_type === 'NIF' && !g.last_name_2) problems.push(`${name}: second surname is required with a DNI.`);
     if ((g.document_type === 'NIF' || g.document_type === 'NIE') && !g.document_support_number) {
       problems.push(`${name}: support number is required with a DNI/NIE.`);
@@ -196,7 +214,7 @@ export function buildSesXml(booking: SesBooking, guests: BookingGuest[]): string
   const c = '        ';
   return (
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<alt:peticion xmlns:alt="http://www.neg.hospedajes.mir.es/altaParteHospedaje">\n` +
+    `<ns2:peticion xmlns:ns2="http://www.neg.hospedajes.mir.es/altaParteHospedaje">\n` +
     `  <solicitud>\n` +
     tag('codigoEstablecimiento', booking.establishment_code.trim(), '    ') +
     `    <comunicacion>\n` +
@@ -213,6 +231,6 @@ export function buildSesXml(booking: SesBooking, guests: BookingGuest[]): string
     guests.map(persona).join('') +
     `    </comunicacion>\n` +
     `  </solicitud>\n` +
-    `</alt:peticion>\n`
+    `</ns2:peticion>\n`
   );
 }
