@@ -455,6 +455,7 @@ CREATE POLICY "Registered users can delete booking guests" ON booking_guests
 --   submitted, can_submit - no guest data. GRANT to anon, authenticated.
 -- submit_guest_checkin(p_token UUID, p_guests JSONB): replaces the booking's
 --   travellers with the submitted list while the check-in is open (not
---   cancelled, police registration not DONE - stays open after check-out).
---   See also 20261102000001_checkin_open_until_registered.sql.
+--   cancelled, police registration not DONE or NA - stays open after
+--   check-out). Current definitions:
+--   supabase/migrations/20261102000002_checkin_closed_on_na.sql
 --   GRANT to anon, authenticated.
